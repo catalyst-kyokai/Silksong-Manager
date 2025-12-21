@@ -1,0 +1,24 @@
+# Build artifacts
+bin/
+obj/
+
+# IDE files
+.vs/
+.idea/
+*.user
+*.suo
+
+# BepInEx build output
+*.dll
+!BepInEx/**/*.dll
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backup files
+*.bak
+*~

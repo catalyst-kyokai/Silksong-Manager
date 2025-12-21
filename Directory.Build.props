@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Set the game path here -->
+    <GamePath>G:\SteamLibrary\steamapps\common\Hollow Knight Silksong</GamePath>
+  </PropertyGroup>
+</Project>
