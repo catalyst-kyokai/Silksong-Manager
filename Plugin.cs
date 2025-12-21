@@ -19,7 +19,7 @@ namespace SilksongManager
         /// <summary>
         /// Configuration instance.
         /// </summary>
-        public static PluginConfig Config { get; private set; }
+        public static PluginConfig ModConfig { get; private set; }
 
         /// <summary>
         /// Gets the current PlayerData instance.
@@ -52,7 +52,7 @@ namespace SilksongManager
             Log.LogInfo($"Silksong Manager v{PluginInfo.VERSION} loading...");
 
             // Initialize configuration
-            Config = new PluginConfig(base.Config);
+            ModConfig = new PluginConfig(base.Config);
 
             // Initialize debug menu
             _debugMenu = gameObject.AddComponent<DebugMenu.DebugMenuController>();
@@ -74,7 +74,7 @@ namespace SilksongManager
 
         private void HandleHotkeys()
         {
-            if (!Config.EnableHotkeys) return;
+            if (!ModConfig.EnableHotkeys) return;
 
             // F2 - Quick Heal
             if (Input.GetKeyDown(KeyCode.F2))

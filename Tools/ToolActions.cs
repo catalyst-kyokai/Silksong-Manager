@@ -14,14 +14,8 @@ namespace SilksongManager.Tools
         /// </summary>
         public static void UnlockAllTools()
         {
-            var toolManager = ToolItemManager.UnsafeInstance;
-            if (toolManager == null)
-            {
-                Plugin.Log.LogWarning("ToolItemManager not available.");
-                return;
-            }
-
-            toolManager.UnlockAllTools();
+            // UnlockAllTools is a static method on ToolItemManager
+            ToolItemManager.UnlockAllTools();
             Plugin.Log.LogInfo("Unlocked all tools.");
         }
 
@@ -30,14 +24,8 @@ namespace SilksongManager.Tools
         /// </summary>
         public static void UnlockAllCrests()
         {
-            var toolManager = ToolItemManager.UnsafeInstance;
-            if (toolManager == null)
-            {
-                Plugin.Log.LogWarning("ToolItemManager not available.");
-                return;
-            }
-
-            toolManager.UnlockAllCrests();
+            // UnlockAllCrests is a static method on ToolItemManager
+            ToolItemManager.UnlockAllCrests();
             Plugin.Log.LogInfo("Unlocked all crests.");
         }
 
@@ -47,10 +35,9 @@ namespace SilksongManager.Tools
         public static List<ToolInfo> GetAllTools()
         {
             var result = new List<ToolInfo>();
-            var toolManager = ToolItemManager.UnsafeInstance;
-            if (toolManager == null) return result;
 
-            var tools = toolManager.GetAllTools();
+            // GetAllTools is a static method
+            var tools = ToolItemManager.GetAllTools();
             foreach (var tool in tools)
             {
                 if (tool != null)
@@ -72,10 +59,9 @@ namespace SilksongManager.Tools
         public static List<ToolInfo> GetUnlockedTools()
         {
             var result = new List<ToolInfo>();
-            var toolManager = ToolItemManager.UnsafeInstance;
-            if (toolManager == null) return result;
 
-            var tools = toolManager.GetUnlockedTools();
+            // GetUnlockedTools is a static method
+            var tools = ToolItemManager.GetUnlockedTools();
             foreach (var tool in tools)
             {
                 if (tool != null)
@@ -97,10 +83,9 @@ namespace SilksongManager.Tools
         public static List<CrestInfo> GetAllCrests()
         {
             var result = new List<CrestInfo>();
-            var toolManager = ToolItemManager.UnsafeInstance;
-            if (toolManager == null) return result;
 
-            var crests = toolManager.GetAllCrests();
+            // GetAllCrests is a static method
+            var crests = ToolItemManager.GetAllCrests();
             foreach (var crest in crests)
             {
                 if (crest != null)
@@ -117,14 +102,12 @@ namespace SilksongManager.Tools
         }
 
         /// <summary>
-        /// Replenish all tools.
+        /// Replenish all tools (at bench).
         /// </summary>
         public static void ReplenishAllTools()
         {
-            var toolManager = ToolItemManager.UnsafeInstance;
-            if (toolManager == null) return;
-
-            toolManager.TryReplenishTools(0, 9999);
+            // TryReplenishTools is a static method with (bool doReplenish, ReplenishMethod method)
+            ToolItemManager.TryReplenishTools(true, ToolItemManager.ReplenishMethod.Bench);
             Plugin.Log.LogInfo("Replenished all tools.");
         }
     }

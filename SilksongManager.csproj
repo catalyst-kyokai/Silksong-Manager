@@ -19,8 +19,8 @@
 
   <ItemGroup>
     <!-- BepInEx Dependencies -->
-    <Reference Include="BepInEx.Core">
-      <HintPath>$(GamePath)\BepInEx\core\BepInEx.Core.dll</HintPath>
+    <Reference Include="BepInEx">
+      <HintPath>$(GamePath)\BepInEx\core\BepInEx.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="0Harmony">
@@ -55,6 +55,10 @@
     </Reference>
     <Reference Include="UnityEngine.Physics2DModule">
       <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\UnityEngine.Physics2DModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     

@@ -122,17 +122,7 @@ namespace SilksongManager.Player
         public static void ToggleInfiniteJumps()
         {
             _infiniteJumpsEnabled = !_infiniteJumpsEnabled;
-
-            if (_infiniteJumpsEnabled)
-            {
-                // Enable infinite double jumps
-                var pd = Plugin.PD;
-                if (pd != null)
-                {
-                    pd.hasDoubleJump = true;
-                }
-            }
-
+            // Note: Actual implementation depends on game's ability system
             Plugin.Log.LogInfo($"Infinite Jumps: {(_infiniteJumpsEnabled ? "ON" : "OFF")}");
         }
 
@@ -289,16 +279,11 @@ namespace SilksongManager.Player
         /// </summary>
         public static void UnlockAllAbilities()
         {
-            var pd = Plugin.PD;
-            if (pd == null) return;
-
-            pd.hasDoubleJump = true;
-            pd.hasDash = true;
-            pd.hasWallJump = true;
-            pd.hasSuperDash = true;
-            // Add more abilities as discovered
-
-            Plugin.Log.LogInfo("Unlocked all abilities.");
+            // Note: Silksong uses a different ability system than Hollow Knight
+            // Abilities may be unlocked through ToolItemManager or other systems
+            ToolItemManager.UnlockAllTools();
+            ToolItemManager.UnlockAllCrests();
+            Plugin.Log.LogInfo("Unlocked all tools and crests.");
         }
     }
 
