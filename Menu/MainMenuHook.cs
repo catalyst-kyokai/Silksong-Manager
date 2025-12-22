@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
@@ -427,130 +428,152 @@ namespace SilksongManager.Menu
 
         private static void ModifyMenuScreenContent(GameObject screenObj)
         {
-            Plugin.Log.LogInfo("Modifying cloned menu screen content...");
+            Plugin.Log.LogInfo("Modifying cloned menu screen content - AGGRESSIVE CLEANUP...");
 
-            // Step 1: Find all TMPro texts and change/hide them
-            var tmpTexts = screenObj.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
-            foreach (var text in tmpTexts)
-            {
-                var objName = text.gameObject.name.ToLower();
+            // STEP 1: Hide ALL direct children first, we'll selectively enable what we need
+            List<GameObject> childrenToKeep = new List<GameObject>();
+            List<GameObject> childrenToHide = new List<GameObject>();
 
-                // Change title
-                if (objName.Contains("title"))
-                {
-                    DisableLocalization(text.gameObject);
-                    text.text = "SS Manager";
-                    Plugin.Log.LogInfo($"Changed title: {text.gameObject.name}");
-                }
-                // Hide any other text that isn't part of a button
-                else if (!objName.Contains("button") && !objName.Contains("back"))
-                {
-                    var parentButton = text.GetComponentInParent<MenuButton>();
-                    if (parentButton == null)
-                    {
-                        text.gameObject.SetActive(false);
-                        Plugin.Log.LogInfo($"Hid text: {text.gameObject.name}");
-                    }
-                }
-            }
-
-            // Step 2: Get all buttons
-            var buttons = screenObj.GetComponentsInChildren<MenuButton>(true);
-            Plugin.Log.LogInfo($"Found {buttons.Length} buttons in cloned screen");
-
-            MenuButton keybindsButton = null;
-
-            foreach (var button in buttons)
-            {
-                // Skip the back button - just reconfigure it
-                if (button == _modMenuScreen.backButton)
-                {
-                    button.OnSubmitPressed = new UnityEvent();
-                    button.OnSubmitPressed.AddListener(OnBackButtonPressed);
-                    Plugin.Log.LogInfo("Configured back button");
-                    continue;
-                }
-
-                // Use first non-back button as Keybinds, disable all others
-                if (keybindsButton == null)
-                {
-                    keybindsButton = button;
-                    DisableLocalization(button.gameObject);
-                    SetButtonTextDirect(button.gameObject, "Keybinds");
-                    button.OnSubmitPressed = new UnityEvent();
-                    button.OnSubmitPressed.AddListener(OnKeybindsButtonPressed);
-                    Plugin.Log.LogInfo($"Configured Keybinds button: {button.gameObject.name}");
-                }
-                else
-                {
-                    // Disable ALL other buttons completely
-                    button.gameObject.SetActive(false);
-                    Plugin.Log.LogInfo($"Disabled button: {button.gameObject.name}");
-                }
-            }
-
-            // Step 3: Hide any remaining UI elements that look like extras content
-            // Look for common extras menu elements
             foreach (Transform child in screenObj.transform)
             {
                 var childName = child.name.ToLower();
 
-                // Keep essential menu elements
-                if (childName.Contains("fleur") || childName.Contains("back") ||
-                    childName.Contains("title") || childName.Contains("canvas"))
+                // Keep: fleurs (decorative), back button area
+                if (childName.Contains("fleur") || childName.Contains("bottom"))
                 {
-                    continue;
+                    childrenToKeep.Add(child.gameObject);
+                    Plugin.Log.LogInfo($"Keeping: {child.name}");
                 }
-
-                // Check if this is a content container
-                var hasMenuButton = child.GetComponentInChildren<MenuButton>(true);
-                if (hasMenuButton != null)
+                else
                 {
-                    // Keep containers with our configured button or back button
-                    var isKeybindsContainer = keybindsButton != null &&
-                        (child == keybindsButton.transform || child.IsChildOf(keybindsButton.transform) ||
-                         keybindsButton.transform.IsChildOf(child));
-                    var isBackContainer = _modMenuScreen.backButton != null &&
-                        (child == _modMenuScreen.backButton.transform ||
-                         child.IsChildOf(_modMenuScreen.backButton.transform) ||
-                         _modMenuScreen.backButton.transform.IsChildOf(child));
-
-                    if (!isKeybindsContainer && !isBackContainer)
-                    {
-                        // Check each button in this container
-                        var childButtons = child.GetComponentsInChildren<MenuButton>(true);
-                        bool hasRelevantButton = false;
-                        foreach (var cb in childButtons)
-                        {
-                            if (cb == keybindsButton || cb == _modMenuScreen.backButton)
-                            {
-                                hasRelevantButton = true;
-                                break;
-                            }
-                        }
-                        if (!hasRelevantButton)
-                        {
-                            child.gameObject.SetActive(false);
-                            Plugin.Log.LogInfo($"Disabled container: {child.name}");
-                        }
-                    }
+                    childrenToHide.Add(child.gameObject);
+                    Plugin.Log.LogInfo($"Will hide: {child.name}");
                 }
             }
 
-            // Step 4: If back button not found in modMenuScreen.backButton, configure it manually
-            if (_modMenuScreen.backButton == null)
+            // Hide children that we don't need
+            foreach (var child in childrenToHide)
             {
-                // Try to find a button that looks like back button
-                foreach (var button in buttons)
+                child.SetActive(false);
+            }
+
+            // STEP 2: Find and configure back button
+            if (_modMenuScreen.backButton != null)
+            {
+                _modMenuScreen.backButton.OnSubmitPressed = new UnityEvent();
+                _modMenuScreen.backButton.OnSubmitPressed.AddListener(OnBackButtonPressed);
+                // Make sure back button's parent is visible
+                _modMenuScreen.backButton.gameObject.SetActive(true);
+                var parent = _modMenuScreen.backButton.transform.parent;
+                while (parent != null && parent != screenObj.transform)
                 {
-                    var btnName = button.gameObject.name.ToLower();
-                    if (btnName.Contains("back"))
+                    parent.gameObject.SetActive(true);
+                    parent = parent.parent;
+                }
+                Plugin.Log.LogInfo("Configured back button");
+            }
+
+            // STEP 3: Create our own title by finding any TMPro text in hidden children that looks like a title
+            TMPro.TextMeshProUGUI titleText = null;
+            foreach (var hiddenChild in childrenToHide)
+            {
+                var tmpTexts = hiddenChild.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
+                foreach (var tmp in tmpTexts)
+                {
+                    if (tmp.gameObject.name.ToLower().Contains("title") ||
+                        tmp.transform.parent?.name.ToLower().Contains("title") == true)
                     {
-                        button.OnSubmitPressed = new UnityEvent();
-                        button.OnSubmitPressed.AddListener(OnBackButtonPressed);
-                        Plugin.Log.LogInfo("Configured back button (found by name)");
+                        titleText = tmp;
                         break;
                     }
+                }
+                if (titleText != null) break;
+            }
+
+            if (titleText != null)
+            {
+                // Enable this title and its parents
+                titleText.gameObject.SetActive(true);
+                var parent = titleText.transform.parent;
+                while (parent != null && parent != screenObj.transform)
+                {
+                    parent.gameObject.SetActive(true);
+                    parent = parent.parent;
+                }
+
+                // Destroy ALL localization components
+                DestroyLocalization(titleText.gameObject);
+                DestroyLocalization(titleText.transform.parent?.gameObject);
+
+                titleText.text = "Silksong Manager";
+                Plugin.Log.LogInfo($"Set title to 'Silksong Manager' on {titleText.gameObject.name}");
+            }
+            else
+            {
+                Plugin.Log.LogWarning("Could not find title text element!");
+            }
+
+            // STEP 4: Create Keybinds button by cloning back button
+            if (_modMenuScreen.backButton != null)
+            {
+                var keybindsButtonObj = Object.Instantiate(_modMenuScreen.backButton.gameObject, screenObj.transform);
+                keybindsButtonObj.name = "KeybindsButton";
+
+                // Position it in the center of the screen
+                var rect = keybindsButtonObj.GetComponent<RectTransform>();
+                if (rect != null)
+                {
+                    rect.anchoredPosition = new Vector2(0, 50); // Center, slightly above middle
+                }
+
+                var keybindsButton = keybindsButtonObj.GetComponent<MenuButton>();
+                if (keybindsButton != null)
+                {
+                    keybindsButton.OnSubmitPressed = new UnityEvent();
+                    keybindsButton.OnSubmitPressed.AddListener(OnKeybindsButtonPressed);
+
+                    // Set text
+                    DestroyLocalization(keybindsButtonObj);
+                    SetButtonTextDirect(keybindsButtonObj, "Keybinds");
+
+                    // Setup navigation
+                    var keybindsNav = keybindsButton.navigation;
+                    keybindsNav.mode = Navigation.Mode.Explicit;
+                    keybindsNav.selectOnDown = _modMenuScreen.backButton;
+                    keybindsButton.navigation = keybindsNav;
+
+                    var backNav = _modMenuScreen.backButton.navigation;
+                    backNav.selectOnUp = keybindsButton;
+                    _modMenuScreen.backButton.navigation = backNav;
+
+                    // Set as default highlight
+                    _modMenuScreen.defaultHighlight = keybindsButton;
+
+                    Plugin.Log.LogInfo("Created Keybinds button from back button clone");
+                }
+            }
+            else
+            {
+                Plugin.Log.LogWarning("Back button not found, cannot create Keybinds button!");
+            }
+
+            Plugin.Log.LogInfo("Menu screen content modification complete!");
+        }
+
+        private static void DestroyLocalization(GameObject obj)
+        {
+            if (obj == null) return;
+
+            var components = obj.GetComponentsInChildren<MonoBehaviour>(true);
+            foreach (var comp in components)
+            {
+                if (comp == null) continue;
+                var typeName = comp.GetType().Name;
+                if (typeName.Contains("Locali") || typeName.Contains("Translat") ||
+                    typeName.Contains("LocalizedText") || typeName.Contains("LocalisedText"))
+                {
+                    Plugin.Log.LogInfo($"Destroying localization component: {typeName}");
+                    Object.DestroyImmediate(comp);
                 }
             }
         }
