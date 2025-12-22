@@ -344,6 +344,7 @@ namespace SilksongManager.Menu
         /// </summary>
         public static void HideMainMenu(UIManager ui)
         {
+            Plugin.Log.LogInfo("HideMainMenu called");
             ui.StartCoroutine(FadeOutSprite(ui.gameTitle));
 
             // Fade out subtitle
@@ -366,6 +367,7 @@ namespace SilksongManager.Menu
         /// </summary>
         public static void ShowMainMenu(UIManager ui)
         {
+            Plugin.Log.LogInfo("ShowMainMenu called");
             ui.StartCoroutine(FadeInSprite(ui.gameTitle));
 
             // Fade in subtitle
