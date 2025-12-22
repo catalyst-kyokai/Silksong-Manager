@@ -223,13 +223,14 @@ namespace SilksongManager.SaveState
             // Apply Hero State
             ApplyStateImmediate(state);
 
-            // Handle Unpause if game was paused
-            if (GameManager.instance.isPaused)
+            // Handle Unpause unconditionally
+            // if (GameManager.instance.isPaused) // Do it always to be safe
             {
                 GameManager.instance.FadeSceneIn();
                 GameManager.instance.isPaused = false;
                 GameCameras.instance.ResumeCameraShake();
                 Plugin.Hero.UnPause();
+
                 // Reflection for MenuButtonList.ClearAllLastSelected()
                 var menuButtonListType = Assembly.GetAssembly(typeof(GameManager)).GetType("MenuButtonList");
                 if (menuButtonListType != null)
@@ -248,6 +249,22 @@ namespace SilksongManager.SaveState
 
                 // Fallback direct Time.timeScale
                 Time.timeScale = 1f;
+
+                // Force GameState to PLAYING via Reflection
+                try
+                {
+                    var setStateMethod = typeof(GameManager).GetMethod("SetState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (setStateMethod != null)
+                    {
+                        setStateMethod.Invoke(GameManager.instance, new object[] { GameState.PLAYING });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.LogError("Failed to force GameState: " + ex.Message);
+                }
+
+                Plugin.Hero.AcceptInput();
             }
 
             // Final Physics Tap
