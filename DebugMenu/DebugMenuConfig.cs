@@ -117,7 +117,12 @@ namespace SilksongManager.DebugMenu
 
             public override string ToString()
             {
-                return $"{Position.x:F0},{Position.y:F0},{Size.x:F0},{Size.y:F0},{(IsVisible ? 1 : 0)}";
+                // Use InvariantCulture to avoid issues with decimal separator
+                return string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    "{0:F0},{1:F0},{2:F0},{3:F0},{4}",
+                    Position.x, Position.y, Size.x, Size.y, IsVisible ? 1 : 0
+                );
             }
 
             public static WindowState Parse(string s, Vector2 defaultPos, Vector2 defaultSize)
@@ -134,10 +139,11 @@ namespace SilksongManager.DebugMenu
                 var parts = s.Split(',');
                 if (parts.Length >= 5)
                 {
-                    if (float.TryParse(parts[0], out float x)) state.Position.x = x;
-                    if (float.TryParse(parts[1], out float y)) state.Position.y = y;
-                    if (float.TryParse(parts[2], out float w)) state.Size.x = Mathf.Max(200, w);
-                    if (float.TryParse(parts[3], out float h)) state.Size.y = Mathf.Max(150, h);
+                    var culture = System.Globalization.CultureInfo.InvariantCulture;
+                    if (float.TryParse(parts[0], System.Globalization.NumberStyles.Float, culture, out float x)) state.Position.x = x;
+                    if (float.TryParse(parts[1], System.Globalization.NumberStyles.Float, culture, out float y)) state.Position.y = y;
+                    if (float.TryParse(parts[2], System.Globalization.NumberStyles.Float, culture, out float w)) state.Size.x = Mathf.Max(200, w);
+                    if (float.TryParse(parts[3], System.Globalization.NumberStyles.Float, culture, out float h)) state.Size.y = Mathf.Max(150, h);
                     if (int.TryParse(parts[4], out int v)) state.IsVisible = v == 1;
                 }
 

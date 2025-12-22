@@ -134,15 +134,14 @@ namespace SilksongManager.Player
         private static void ProcessInfiniteJumps(HeroController hero)
         {
             // Make game think player is always on ground = infinite regular jumps
-            // This is the most reliable method as it allows standard jump behavior
-            if (!hero.cState.jumping && !hero.cState.doubleJumping)
+            // Set onGround to true every frame when not in double jump animation
+            // This allows jumping at any time, including during falling
+            if (!hero.cState.doubleJumping)
             {
-                // Only set onGround when not actively in a jump animation
-                // This allows the jump to initiate properly
                 hero.cState.onGround = true;
             }
 
-            // Also reset doubleJumped flag for extra jumps
+            // Also reset doubleJumped flag for extra double jumps
             if (_doubleJumpedField != null)
             {
                 try
