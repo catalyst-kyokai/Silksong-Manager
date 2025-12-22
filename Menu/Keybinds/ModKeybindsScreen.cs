@@ -559,7 +559,8 @@ namespace SilksongManager.Menu.Keybinds
             RefreshAllDisplays();
 
             // NOTE: We transition from SS Manager, not main menu
-            // SS Manager is hidden, main menu was already hidden when entering SS Manager
+            // However, ensuring main menu is hidden prevents it from reappearing if UIManager acts up
+            MainMenuHook.HideMainMenu(ui);
 
             var cg = _keybindsMenuScreen.GetComponent<CanvasGroup>();
             _keybindsMenuScreen.gameObject.SetActive(true);
