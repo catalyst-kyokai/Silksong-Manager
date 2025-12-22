@@ -156,7 +156,7 @@ namespace SilksongManager.Menu.Keybinds
                 var textComp = titleTransform.GetComponent<Text>();
                 if (textComp != null)
                 {
-                    textComp.text = "KEYBINDS";
+                    textComp.text = "Silksong Manager Keybinds";
                     _gameFont = textComp.font;
                 }
             }
@@ -270,8 +270,11 @@ namespace SilksongManager.Menu.Keybinds
             contentRect.offsetMax = Vector2.zero;
 
             // Create two-column layout
-            var leftColumn = CreateColumn(contentObj.transform, new Vector2(0, 0.5f), new Vector2(0.48f, 1f));
-            var rightColumn = CreateColumn(contentObj.transform, new Vector2(0.52f, 0.5f), new Vector2(1f, 1f));
+            // Create two-column layout with central gap
+            // Left column: 5% to 45% width, Full height
+            var leftColumn = CreateColumn(contentObj.transform, new Vector2(0.05f, 0f), new Vector2(0.45f, 1f));
+            // Right column: 55% to 95% width, Full height
+            var rightColumn = CreateColumn(contentObj.transform, new Vector2(0.55f, 0f), new Vector2(0.95f, 1f));
 
             // Get all actions
             var actions = (ModAction[])Enum.GetValues(typeof(ModAction));
@@ -321,12 +324,12 @@ namespace SilksongManager.Menu.Keybinds
             entryObj.transform.SetParent(parent, false);
 
             var entryRect = entryObj.AddComponent<RectTransform>();
-            entryRect.sizeDelta = new Vector2(0, 55);
+            entryRect.sizeDelta = new Vector2(0, 85); // Increased height
 
             // Horizontal layout like game: label  [key]
             var hLayout = entryObj.AddComponent<HorizontalLayoutGroup>();
             hLayout.childAlignment = TextAnchor.MiddleRight;
-            hLayout.spacing = 15;
+            hLayout.spacing = 60; // Increased spacing
             hLayout.childControlWidth = false;
             hLayout.childControlHeight = true;
             hLayout.childForceExpandWidth = false;
@@ -341,20 +344,20 @@ namespace SilksongManager.Menu.Keybinds
 
             var labelText = labelObj.AddComponent<Text>();
             labelText.font = GetGameFont();
-            labelText.fontSize = 32; // Larger font
+            labelText.fontSize = 42; // Larger font
             labelText.fontStyle = FontStyle.Normal;
             labelText.alignment = TextAnchor.MiddleRight;
             labelText.color = Color.white;
-            labelText.text = ModKeybindManager.GetActionName(action).ToUpper(); // UPPERCASE
+            labelText.text = ModKeybindManager.GetActionName(action).ToUpper();
 
             // Key button (right side) - styled like game
             var keyBtnObj = new GameObject("KeyButton");
             keyBtnObj.transform.SetParent(entryObj.transform, false);
             var keyRect = keyBtnObj.AddComponent<RectTransform>();
-            keyRect.sizeDelta = new Vector2(70, 45);
+            keyRect.sizeDelta = new Vector2(110, 65); // Larger button
             var keyLayout = keyBtnObj.AddComponent<LayoutElement>();
-            keyLayout.preferredWidth = 70;
-            keyLayout.preferredHeight = 45;
+            keyLayout.preferredWidth = 110;
+            keyLayout.preferredHeight = 65;
 
             // Background image (styled like game keys)
             var uibs = UIManager.instance?.uiButtonSkins;
@@ -374,7 +377,7 @@ namespace SilksongManager.Menu.Keybinds
 
             var keyText = keyTextObj.AddComponent<Text>();
             keyText.font = GetGameFont();
-            keyText.fontSize = 24;
+            keyText.fontSize = 34; // Larger key font
             keyText.fontStyle = FontStyle.Bold;
             keyText.alignment = TextAnchor.MiddleCenter;
             keyText.color = Color.white;  // WHITE text like game
