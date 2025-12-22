@@ -486,98 +486,121 @@ namespace SilksongManager.Menu
 
         private static void ModifyMenuScreenContent(GameObject screenObj)
         {
-            Plugin.Log.LogInfo("Modifying cloned menu screen content - AGGRESSIVE CLEANUP...");
+            Plugin.Log.LogInfo("Modifying cloned menu screen content - DESTROYING unwanted elements...");
 
-            // STEP 1: Hide ALL direct children - EVERYTHING
-            // We will then selectively show only what we need
-            foreach (Transform child in screenObj.transform)
-            {
-                child.gameObject.SetActive(false);
-                Plugin.Log.LogInfo($"Hiding: {child.name}");
-            }
-
-            // STEP 2: Find and enable Title element, change its text
-            foreach (Transform child in screenObj.transform)
-            {
-                if (child.name.ToLower().Contains("title"))
-                {
-                    child.gameObject.SetActive(true);
-
-                    // Title uses UI.Text, not TMPro (based on hierarchy log)
-                    var textComponent = child.GetComponent<Text>();
-                    if (textComponent != null)
-                    {
-                        DestroyLocalization(child.gameObject);
-                        textComponent.text = "Silksong Manager";
-                        Plugin.Log.LogInfo($"Set title UI.Text to 'Silksong Manager'");
-                    }
-                    else
-                    {
-                        // Fallback to TMPro if Text not found
-                        var tmpTexts = child.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
-                        foreach (var tmp in tmpTexts)
-                        {
-                            DestroyLocalization(tmp.gameObject);
-                            tmp.text = "Silksong Manager";
-                            Plugin.Log.LogInfo($"Set title TMPro to 'Silksong Manager' on {tmp.gameObject.name}");
-                        }
-                    }
-
-                    Plugin.Log.LogInfo($"Enabled and modified Title: {child.name}");
-                    break;
-                }
-            }
-
-            // STEP 3: Find and enable fleurs (decorative)
-            foreach (Transform child in screenObj.transform)
-            {
-                if (child.name.ToLower().Contains("fleur"))
-                {
-                    child.gameObject.SetActive(true);
-                    Plugin.Log.LogInfo($"Enabled Fleur: {child.name}");
-                }
-            }
-
-            // STEP 4: Handle back button - REPARENT it to screen root instead of enabling parents
-            // This prevents enabling Controls which contains other elements
+            // STEP 0: FIRST - Reparent backButton to screen root BEFORE we destroy its parent!
+            MenuButton savedBackButton = null;
             if (_modMenuScreen.backButton != null)
             {
-                var backBtn = _modMenuScreen.backButton;
-                backBtn.OnSubmitPressed = new UnityEvent();
-                backBtn.OnSubmitPressed.AddListener(OnBackButtonPressed);
+                savedBackButton = _modMenuScreen.backButton;
+                savedBackButton.transform.SetParent(screenObj.transform, false);
+                savedBackButton.gameObject.SetActive(false); // Hide for now
+                Plugin.Log.LogInfo($"Saved backButton from destruction: {savedBackButton.name}");
+            }
 
-                // Reparent to screen root to avoid enabling sibling elements
-                backBtn.transform.SetParent(screenObj.transform, false);
-                backBtn.gameObject.SetActive(true);
+            // Collect elements to keep vs destroy
+            var toDestroy = new List<GameObject>();
+            Transform titleTransform = null;
+            Transform topFleurTransform = null;
+
+            foreach (Transform child in screenObj.transform)
+            {
+                // Skip the saved back button
+                if (savedBackButton != null && child == savedBackButton.transform)
+                {
+                    Plugin.Log.LogInfo($"Skipping (saved): {child.name}");
+                    continue;
+                }
+
+                var childName = child.name.ToLower();
+
+                if (childName.Contains("title"))
+                {
+                    titleTransform = child;
+                    Plugin.Log.LogInfo($"Keeping: {child.name}");
+                }
+                else if (childName.Contains("fleur"))
+                {
+                    topFleurTransform = child;
+                    Plugin.Log.LogInfo($"Keeping: {child.name}");
+                }
+                else
+                {
+                    // DESTROY everything else - Content, Controls, CheatCodeListener, ImportSavePrompt
+                    toDestroy.Add(child.gameObject);
+                    Plugin.Log.LogInfo($"Will DESTROY: {child.name}");
+                }
+            }
+
+            // DESTROY unwanted elements
+            foreach (var obj in toDestroy)
+            {
+                Plugin.Log.LogInfo($"Destroying: {obj.name}");
+                Object.DestroyImmediate(obj);
+            }
+
+            // STEP 2: Modify Title text
+            if (titleTransform != null)
+            {
+                titleTransform.gameObject.SetActive(true);
+
+                // Title uses UI.Text (based on hierarchy log)
+                var textComponent = titleTransform.GetComponent<Text>();
+                if (textComponent != null)
+                {
+                    DestroyLocalization(titleTransform.gameObject);
+                    textComponent.text = "Silksong Manager";
+                    Plugin.Log.LogInfo($"Set title UI.Text to 'Silksong Manager'");
+                }
+            }
+            else
+            {
+                Plugin.Log.LogWarning("Title element not found!");
+            }
+
+            // STEP 3: Enable fleurs
+            if (topFleurTransform != null)
+            {
+                topFleurTransform.gameObject.SetActive(true);
+                Plugin.Log.LogInfo($"Enabled TopFleur");
+            }
+
+            // STEP 4: Configure and position back button
+            if (savedBackButton != null)
+            {
+                savedBackButton.OnSubmitPressed = new UnityEvent();
+                savedBackButton.OnSubmitPressed.AddListener(OnBackButtonPressed);
+                savedBackButton.gameObject.SetActive(true);
 
                 // Position at bottom of screen
-                var backRect = backBtn.GetComponent<RectTransform>();
+                var backRect = savedBackButton.GetComponent<RectTransform>();
                 if (backRect != null)
                 {
                     backRect.anchorMin = new Vector2(0.5f, 0);
                     backRect.anchorMax = new Vector2(0.5f, 0);
-                    backRect.pivot = new Vector2(0.5f, 0);
-                    backRect.anchoredPosition = new Vector2(0, 50);
+                    backRect.pivot = new Vector2(0.5f, 0.5f);
+                    backRect.anchoredPosition = new Vector2(0, 80);
                 }
 
-                Plugin.Log.LogInfo($"Configured and reparented back button to screen root");
-            }
-            else
-            {
-                Plugin.Log.LogWarning("Back button not found in cloned MenuScreen!");
+                DestroyLocalization(savedBackButton.gameObject);
+
+                Plugin.Log.LogInfo($"Configured back button at bottom of screen");
             }
 
-            // STEP 4: Create Keybinds button by cloning back button
+            // STEP 5: Create Keybinds button by cloning back button
             if (_modMenuScreen.backButton != null)
             {
                 var keybindsButtonObj = Object.Instantiate(_modMenuScreen.backButton.gameObject, screenObj.transform);
                 keybindsButtonObj.name = "KeybindsButton";
 
-                // Position it in the center of the screen
+                // Position above the back button
                 var rect = keybindsButtonObj.GetComponent<RectTransform>();
                 if (rect != null)
                 {
-                    rect.anchoredPosition = new Vector2(0, 50); // Center, slightly above middle
+                    rect.anchorMin = new Vector2(0.5f, 0.5f);
+                    rect.anchorMax = new Vector2(0.5f, 0.5f);
+                    rect.pivot = new Vector2(0.5f, 0.5f);
+                    rect.anchoredPosition = new Vector2(0, 0); // Center of screen
                 }
 
                 var keybindsButton = keybindsButtonObj.GetComponent<MenuButton>();
@@ -603,7 +626,7 @@ namespace SilksongManager.Menu
                     // Set as default highlight
                     _modMenuScreen.defaultHighlight = keybindsButton;
 
-                    Plugin.Log.LogInfo("Created Keybinds button from back button clone");
+                    Plugin.Log.LogInfo("Created Keybinds button at center");
                 }
             }
             else
