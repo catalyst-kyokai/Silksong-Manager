@@ -66,7 +66,7 @@ namespace SilksongManager.SaveState
                 // We use JsonUtility as SceneData is a ScriptableObject often
                 if (SceneData.instance != null)
                 {
-                    state.SceneDataJson = JsonUtility.ToJson(SceneData.instance);
+                    state.SceneDataJson = UnityEngine.JsonUtility.ToJson(SceneData.instance);
                 }
 
                 // Capture Hero State
@@ -117,11 +117,10 @@ namespace SilksongManager.SaveState
 
             // 2. Load Dummy Scene ("Demo Start") to clear memory/state
             string dummySceneName = "Demo Start";
-            // Check if we are already in dummy scene? Unlikely, but safe to reload
 
-            // Use Addressables for async loading if possible, or fallback to SceneManager
-            // Silksong uses Addressables for scenes usually
-            yield return Addressables.LoadSceneAsync("Scenes/" + dummySceneName, LoadSceneMode.Single).Task.AsIEnumerator();
+            // Use Addressables for async loading
+            var loadOp = Addressables.LoadSceneAsync("Scenes/" + dummySceneName, LoadSceneMode.Single);
+            yield return loadOp;
 
             // Wait for dummy scene
             yield return new WaitUntil(() => SceneManager.GetActiveScene().name == dummySceneName);
@@ -133,7 +132,7 @@ namespace SilksongManager.SaveState
             }
             if (SceneData.instance != null && !string.IsNullOrEmpty(state.SceneDataJson))
             {
-                JsonUtility.FromJsonOverwrite(state.SceneDataJson, SceneData.instance);
+                UnityEngine.JsonUtility.FromJsonOverwrite(state.SceneDataJson, SceneData.instance);
             }
 
             // Reset transitions
@@ -188,10 +187,9 @@ namespace SilksongManager.SaveState
                 if (Plugin.Hero == null) return;
                 var hero = Plugin.Hero;
 
-                // Position logic is handled largely by FindEntryPoint patch + GM spawn,
-                // but we double tap it here just in case
+                // Logic handled by FindEntryPoint largely
                 hero.transform.position = state.Position;
-                hero.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero; // Stop physics
+                hero.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
                 hero.GetComponent<Rigidbody2D>().isKinematic = false;
 
                 // Face direction
@@ -214,7 +212,6 @@ namespace SilksongManager.SaveState
                     hero.cState.onGround = true;
                     anim.PlayClip("Idle");
 
-                    // Force ProxyFSM to Idle
                     var proxyFSMField = typeof(HeroController).GetField("proxyFSM", BindingFlags.Instance | BindingFlags.NonPublic);
                     var proxyFSM = proxyFSMField?.GetValue(hero) as PlayMakerFSM;
                     proxyFSM?.SendEvent("HeroCtrl-Idle");
@@ -265,35 +262,14 @@ namespace SilksongManager.SaveState
             }
         }
 
-        // --- Harmony Patch to Hijack Spawn Point ---
-
-        // [HarmonyPatch(typeof(GameManager), "FindEntryPoint")]
         public static bool FindEntryPointPatch(GameManager __instance, ref Vector2? __result, string entryPointName)
         {
-            // If we are loading a specific state via our system
             if (_pendingLoadState != null && entryPointName == "dreamGate")
             {
-                // Hijack the "dreamGate" entry point to return our saved position
                 __result = _pendingLoadState.Position;
-                return false; // Skip original method
+                return false;
             }
-            return true; // Run original method
-        }
-    }
-
-    // Helper to run Task as IEnumerator
-    public static class TaskExtensions
-    {
-        public static IEnumerator AsIEnumerator(this System.Threading.Tasks.Task task)
-        {
-            while (!task.IsCompleted)
-            {
-                yield return null;
-            }
-            if (task.IsFaulted)
-            {
-                throw task.Exception ?? new Exception("Task failed");
-            }
+            return true;
         }
     }
 }
