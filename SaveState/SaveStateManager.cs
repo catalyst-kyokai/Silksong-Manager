@@ -190,8 +190,6 @@ namespace SilksongManager.SaveState
                 EntryDelay = 0f,
                 WaitForSceneTransitionCameraFade = false,
                 Visualization = GameManager.SceneLoadVisualizations.Default,
-                WaitForSceneTransitionCameraFade = false,
-                Visualization = GameManager.SceneLoadVisualizations.Default,
                 AlwaysUnloadUnusedAssets = true
             });
 
