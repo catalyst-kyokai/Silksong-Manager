@@ -16,13 +16,16 @@ namespace SilksongManager.Menu
         private static MenuScreen _settingsScreen;
         private static bool _initialized = false;
         private static bool _isActive = false;
-        
+        private static bool _isExiting = false;
+
         public static bool IsActive => _isActive;
-        
+        public static bool IsExiting => _isExiting;
+
+
         public static void Initialize()
         {
             if (_initialized) return;
-            
+
             try
             {
                 CreateSettingsScreen();
@@ -34,14 +37,14 @@ namespace SilksongManager.Menu
                 Plugin.Log.LogError($"Failed to initialize ModSettingsScreen: {e}");
             }
         }
-        
+
         public static void Reset()
         {
             _initialized = false;
             _settingsScreen = null;
             _isActive = false;
         }
-        
+
         private static void CreateSettingsScreen()
         {
             var ui = UIManager.instance;
@@ -50,25 +53,25 @@ namespace SilksongManager.Menu
                 Plugin.Log.LogError("UIManager not found!");
                 return;
             }
-            
+
             var templateScreen = ui.extrasMenuScreen;
             if (templateScreen == null)
             {
                 Plugin.Log.LogError("ExtrasMenuScreen not found!");
                 return;
             }
-            
+
             // Clone the screen
             var screenObj = Object.Instantiate(templateScreen.gameObject, templateScreen.transform.parent);
             screenObj.name = "ModSettingsScreen";
-            
+
             _settingsScreen = screenObj.GetComponent<MenuScreen>();
             if (_settingsScreen == null)
             {
                 Object.Destroy(screenObj);
                 return;
             }
-            
+
             // Hide initially
             screenObj.SetActive(false);
             var cg = screenObj.GetComponent<CanvasGroup>();
@@ -77,10 +80,10 @@ namespace SilksongManager.Menu
                 cg.alpha = 0f;
                 cg.interactable = false;
             }
-            
+
             ModifyScreenContent(screenObj);
         }
-        
+
         private static void ModifyScreenContent(GameObject screenObj)
         {
             // Save back button first
@@ -91,16 +94,16 @@ namespace SilksongManager.Menu
                 savedBackButton.transform.SetParent(screenObj.transform, false);
                 savedBackButton.gameObject.SetActive(false);
             }
-            
+
             // Destroy all children except title and fleur
             var toDestroy = new System.Collections.Generic.List<GameObject>();
             Transform titleTransform = null;
-            
+
             foreach (Transform child in screenObj.transform)
             {
                 if (savedBackButton != null && child == savedBackButton.transform)
                     continue;
-                    
+
                 var name = child.name.ToLower();
                 if (name.Contains("title"))
                 {
@@ -115,12 +118,12 @@ namespace SilksongManager.Menu
                     toDestroy.Add(child.gameObject);
                 }
             }
-            
+
             foreach (var obj in toDestroy)
             {
                 Object.DestroyImmediate(obj);
             }
-            
+
             // Set title
             if (titleTransform != null)
             {
@@ -130,14 +133,14 @@ namespace SilksongManager.Menu
                 if (textComp != null)
                     textComp.text = "Settings";
             }
-            
+
             // Configure back button
             if (savedBackButton != null)
             {
                 savedBackButton.OnSubmitPressed = new UnityEvent();
                 savedBackButton.OnSubmitPressed.AddListener(OnBackPressed);
                 savedBackButton.gameObject.SetActive(true);
-                
+
                 var backRect = savedBackButton.GetComponent<RectTransform>();
                 if (backRect != null)
                 {
@@ -146,60 +149,60 @@ namespace SilksongManager.Menu
                     backRect.pivot = new Vector2(0.5f, 0.5f);
                     backRect.anchoredPosition = new Vector2(0, 80);
                 }
-                
+
                 DestroyLocalization(savedBackButton.gameObject);
             }
-            
+
             // Create settings content
             CreateSettingsContent(screenObj, savedBackButton);
         }
-        
+
         private static void CreateSettingsContent(GameObject screenObj, MenuButton backButton)
         {
             // Create settings toggles using cloned buttons
             float startY = 80;
             float spacing = -50;
             int index = 0;
-            
+
             // Pause Game on Menu
-            var pauseToggle = CreateToggleButton(screenObj, "PauseGameToggle", 
+            var pauseToggle = CreateToggleButton(screenObj, "PauseGameToggle",
                 "Pause Game on Menu Open", startY + (index++ * spacing),
                 () => DebugMenu.DebugMenuConfig.PauseGameOnMenu,
                 (val) => DebugMenu.DebugMenuConfig.PauseGameOnMenu = val);
-            
+
             // Enable Hotkeys
             var hotkeysToggle = CreateToggleButton(screenObj, "HotkeysToggle",
                 "Enable Hotkeys", startY + (index++ * spacing),
                 () => Plugin.ModConfig.EnableHotkeys,
                 (val) => Plugin.ModConfig.EnableHotkeys = val);
-            
+
             // Setup navigation
             MenuButton firstButton = pauseToggle?.GetComponent<MenuButton>();
             MenuButton secondButton = hotkeysToggle?.GetComponent<MenuButton>();
-            
+
             if (firstButton != null && secondButton != null && backButton != null)
             {
                 SetupNavigation(firstButton, backButton, secondButton);
                 SetupNavigation(secondButton, firstButton, backButton);
-                
+
                 var backNav = backButton.navigation;
                 backNav.mode = Navigation.Mode.Explicit;
                 backNav.selectOnUp = secondButton;
                 backNav.selectOnDown = firstButton;
                 backButton.navigation = backNav;
-                
+
                 _settingsScreen.defaultHighlight = firstButton;
             }
         }
-        
+
         private static GameObject CreateToggleButton(GameObject parent, string name, string label, float yOffset,
             Func<bool> getter, Action<bool> setter)
         {
             if (_settingsScreen?.backButton == null) return null;
-            
+
             var buttonObj = Object.Instantiate(_settingsScreen.backButton.gameObject, parent.transform);
             buttonObj.name = name;
-            
+
             var rect = buttonObj.GetComponent<RectTransform>();
             if (rect != null)
             {
@@ -208,7 +211,7 @@ namespace SilksongManager.Menu
                 rect.pivot = new Vector2(0.5f, 0.5f);
                 rect.anchoredPosition = new Vector2(0, yOffset);
             }
-            
+
             var menuButton = buttonObj.GetComponent<MenuButton>();
             if (menuButton != null)
             {
@@ -219,14 +222,14 @@ namespace SilksongManager.Menu
                     setter(newVal);
                     UpdateToggleText(buttonObj, label, newVal);
                 });
-                
+
                 DestroyLocalization(buttonObj);
                 UpdateToggleText(buttonObj, label, getter());
             }
-            
+
             return buttonObj;
         }
-        
+
         private static void UpdateToggleText(GameObject buttonObj, string label, bool isOn)
         {
             var text = buttonObj.GetComponentInChildren<Text>(true);
@@ -234,14 +237,14 @@ namespace SilksongManager.Menu
             {
                 text.text = $"{label}: {(isOn ? "ON" : "OFF")}";
             }
-            
+
             var tmp = buttonObj.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
             if (tmp != null)
             {
                 tmp.text = $"{label}: {(isOn ? "ON" : "OFF")}";
             }
         }
-        
+
         private static void SetupNavigation(MenuButton button, MenuButton up, MenuButton down)
         {
             if (button == null) return;
@@ -251,7 +254,7 @@ namespace SilksongManager.Menu
             nav.selectOnDown = down;
             button.navigation = nav;
         }
-        
+
         private static void DestroyLocalization(GameObject obj)
         {
             if (obj == null) return;
@@ -266,60 +269,112 @@ namespace SilksongManager.Menu
                 }
             }
         }
-        
+
         private static void OnBackPressed()
         {
+            if (_isExiting) return;
             Plugin.Log.LogInfo("Settings back button pressed");
             MainMenuHook.ReturnFromSettingsScreen();
         }
-        
+
         public static IEnumerator Show(UIManager ui)
         {
             if (_settingsScreen == null) yield break;
-            
+
             _isActive = true;
+            _isExiting = false;
+
+            // IMPORTANT: Hide main menu like Keybinds does
+            MainMenuHook.HideMainMenu(ui);
+
             var cg = _settingsScreen.GetComponent<CanvasGroup>();
+            _settingsScreen.gameObject.SetActive(true);
+
+            // Add/enable input controller that keeps main menu hidden
+            var inputController = _settingsScreen.gameObject.GetComponent<SettingsInputController>();
+            if (inputController == null)
+            {
+                inputController = _settingsScreen.gameObject.AddComponent<SettingsInputController>();
+            }
+            inputController.enabled = true;
+
             if (cg != null)
             {
-                _settingsScreen.gameObject.SetActive(true);
+                cg.interactable = true;
+                cg.blocksRaycasts = true;
                 cg.alpha = 0f;
+
                 float fade = 0f;
                 while (fade < 1f)
                 {
-                    fade += Time.unscaledDeltaTime * ui.MENU_FADE_SPEED;
+                    fade += Time.unscaledDeltaTime * 4f;
                     cg.alpha = fade;
                     yield return null;
                 }
                 cg.alpha = 1f;
-                cg.interactable = true;
             }
-            else
-            {
-                _settingsScreen.gameObject.SetActive(true);
-            }
-            
+
             _settingsScreen.HighlightDefault();
+            Plugin.Log.LogInfo("Settings screen shown");
         }
-        
+
         public static IEnumerator Hide(UIManager ui)
         {
             if (_settingsScreen == null) yield break;
-            
-            _isActive = false;
+
+            _isExiting = true;
+
             var cg = _settingsScreen.GetComponent<CanvasGroup>();
             if (cg != null)
             {
                 float fade = 1f;
                 while (fade > 0f)
                 {
-                    fade -= Time.unscaledDeltaTime * ui.MENU_FADE_SPEED;
+                    fade -= Time.unscaledDeltaTime * 4f;
                     cg.alpha = fade;
                     yield return null;
                 }
                 cg.alpha = 0f;
                 cg.interactable = false;
+                cg.blocksRaycasts = false;
             }
+
             _settingsScreen.gameObject.SetActive(false);
+            _isActive = false;
+            _isExiting = false;
+        }
+    }
+
+    /// <summary>
+    /// Controller that handles Escape and keeps main menu hidden.
+    /// </summary>
+    public class SettingsInputController : MonoBehaviour
+    {
+        void Update()
+        {
+            if (!ModSettingsScreen.IsActive) return;
+
+            // Failsafe: Keep main menu hidden
+            var ui = UIManager.instance;
+            if (ui != null && ui.mainMenuScreen != null && ui.mainMenuScreen.gameObject.activeSelf)
+            {
+                ui.mainMenuScreen.gameObject.SetActive(false);
+
+                if (ui.gameTitle != null && (ui.gameTitle.color.a > 0.1f || ui.gameTitle.enabled))
+                {
+                    ui.gameTitle.color = new Color(ui.gameTitle.color.r, ui.gameTitle.color.g, ui.gameTitle.color.b, 0f);
+                    ui.gameTitle.enabled = false;
+                }
+            }
+
+            // Handle Escape key
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                if (ModSettingsScreen.IsExiting) return;
+                Plugin.Log.LogInfo("Escape pressed in Settings, returning to SS Manager");
+                MainMenuHook.ReturnFromSettingsScreen();
+            }
         }
     }
 }
+
