@@ -430,31 +430,44 @@ namespace SilksongManager.Menu
         {
             Plugin.Log.LogInfo("Modifying cloned menu screen content - AGGRESSIVE CLEANUP...");
 
-            // STEP 1: Hide ALL direct children first, we'll selectively enable what we need
-            List<GameObject> childrenToKeep = new List<GameObject>();
-            List<GameObject> childrenToHide = new List<GameObject>();
-
+            // STEP 1: Hide ALL direct children - EVERYTHING
+            // We will then selectively show only what we need
             foreach (Transform child in screenObj.transform)
             {
-                var childName = child.name.ToLower();
+                child.gameObject.SetActive(false);
+                Plugin.Log.LogInfo($"Hiding: {child.name}");
+            }
 
-                // Keep: fleurs (decorative), back button area
-                if (childName.Contains("fleur") || childName.Contains("bottom"))
+            // STEP 2: Find and enable Title element, change its text
+            foreach (Transform child in screenObj.transform)
+            {
+                if (child.name.ToLower().Contains("title"))
                 {
-                    childrenToKeep.Add(child.gameObject);
-                    Plugin.Log.LogInfo($"Keeping: {child.name}");
-                }
-                else
-                {
-                    childrenToHide.Add(child.gameObject);
-                    Plugin.Log.LogInfo($"Will hide: {child.name}");
+                    child.gameObject.SetActive(true);
+
+                    // Find and modify TMPro text inside, destroy localization
+                    var tmpTexts = child.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
+                    foreach (var tmp in tmpTexts)
+                    {
+                        DestroyLocalization(tmp.gameObject);
+                        tmp.text = "Silksong Manager";
+                        tmp.gameObject.SetActive(true);
+                        Plugin.Log.LogInfo($"Set title text to 'Silksong Manager' on {tmp.gameObject.name}");
+                    }
+
+                    Plugin.Log.LogInfo($"Enabled and modified Title: {child.name}");
+                    break;
                 }
             }
 
-            // Hide children that we don't need
-            foreach (var child in childrenToHide)
+            // STEP 3: Find and enable fleurs (decorative)
+            foreach (Transform child in screenObj.transform)
             {
-                child.SetActive(false);
+                if (child.name.ToLower().Contains("fleur"))
+                {
+                    child.gameObject.SetActive(true);
+                    Plugin.Log.LogInfo($"Enabled Fleur: {child.name}");
+                }
             }
 
             // STEP 2: Find and configure back button
@@ -471,46 +484,6 @@ namespace SilksongManager.Menu
                     parent = parent.parent;
                 }
                 Plugin.Log.LogInfo("Configured back button");
-            }
-
-            // STEP 3: Create our own title by finding any TMPro text in hidden children that looks like a title
-            TMPro.TextMeshProUGUI titleText = null;
-            foreach (var hiddenChild in childrenToHide)
-            {
-                var tmpTexts = hiddenChild.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
-                foreach (var tmp in tmpTexts)
-                {
-                    if (tmp.gameObject.name.ToLower().Contains("title") ||
-                        tmp.transform.parent?.name.ToLower().Contains("title") == true)
-                    {
-                        titleText = tmp;
-                        break;
-                    }
-                }
-                if (titleText != null) break;
-            }
-
-            if (titleText != null)
-            {
-                // Enable this title and its parents
-                titleText.gameObject.SetActive(true);
-                var parent = titleText.transform.parent;
-                while (parent != null && parent != screenObj.transform)
-                {
-                    parent.gameObject.SetActive(true);
-                    parent = parent.parent;
-                }
-
-                // Destroy ALL localization components
-                DestroyLocalization(titleText.gameObject);
-                DestroyLocalization(titleText.transform.parent?.gameObject);
-
-                titleText.text = "Silksong Manager";
-                Plugin.Log.LogInfo($"Set title to 'Silksong Manager' on {titleText.gameObject.name}");
-            }
-            else
-            {
-                Plugin.Log.LogWarning("Could not find title text element!");
             }
 
             // STEP 4: Create Keybinds button by cloning back button
