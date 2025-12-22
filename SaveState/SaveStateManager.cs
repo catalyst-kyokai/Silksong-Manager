@@ -207,8 +207,24 @@ namespace SilksongManager.SaveState
                 GameManager.instance.isPaused = false;
                 GameCameras.instance.ResumeCameraShake();
                 Plugin.Hero.UnPause();
-                MenuButtonList.ClearAllLastSelected();
-                TimeManager.TimeScale = 1f;
+                // Reflection for MenuButtonList.ClearAllLastSelected()
+                var menuButtonListType = Assembly.GetAssembly(typeof(GameManager)).GetType("MenuButtonList");
+                if (menuButtonListType != null)
+                {
+                    var clearMethod = menuButtonListType.GetMethod("ClearAllLastSelected", BindingFlags.Public | BindingFlags.Static);
+                    clearMethod?.Invoke(null, null);
+                }
+
+                // Reflection for TimeManager.TimeScale = 1f
+                var timeManagerType = Assembly.GetAssembly(typeof(GameManager)).GetType("TimeManager");
+                if (timeManagerType != null)
+                {
+                    var timeScaleProp = timeManagerType.GetProperty("TimeScale", BindingFlags.Public | BindingFlags.Static);
+                    timeScaleProp?.SetValue(null, 1f);
+                }
+
+                // Fallback direct Time.timeScale
+                Time.timeScale = 1f;
             }
 
             // Final Physics Tap
