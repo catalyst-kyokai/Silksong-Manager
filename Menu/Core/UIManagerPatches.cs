@@ -47,7 +47,7 @@ namespace SilksongManager.Menu.Core
         }
 
         /// <summary>
-        /// Postfix on UIManager.Awake to initialize templates and add SS Manager button.
+        /// Postfix on UIManager.Awake to initialize templates and start button addition.
         /// </summary>
         [HarmonyPatch(typeof(UIManager), "Awake")]
         [HarmonyPostfix]
@@ -58,8 +58,8 @@ namespace SilksongManager.Menu.Core
                 // Initialize template system
                 MenuTemplates.Initialize(__instance);
 
-                // Add SS Manager button to options menu
-                AddSSManagerButton(__instance);
+                // Start coroutine to wait for MainMenuOptions and add button
+                __instance.StartCoroutine(WaitAndAddSSManagerButton(__instance));
 
                 Plugin.Log.LogInfo("UIManager hooked successfully");
             }
@@ -67,6 +67,30 @@ namespace SilksongManager.Menu.Core
             {
                 Plugin.Log.LogError($"UIManager_Awake_Postfix error: {e.Message}");
             }
+        }
+
+        private static System.Collections.IEnumerator WaitAndAddSSManagerButton(UIManager uiManager)
+        {
+            float timeout = 15f;
+            float elapsed = 0f;
+
+            // Wait for MainMenuOptions to exist
+            while (elapsed < timeout)
+            {
+                var mainMenuOptions = UnityEngine.Object.FindObjectOfType<MainMenuOptions>();
+                if (mainMenuOptions != null)
+                {
+                    // Wait one more frame for everything to settle
+                    yield return null;
+                    AddSSManagerButton(uiManager);
+                    yield break;
+                }
+
+                yield return new UnityEngine.WaitForSeconds(0.1f);
+                elapsed += 0.1f;
+            }
+
+            Plugin.Log.LogWarning("Timeout waiting for MainMenuOptions");
         }
 
         /// <summary>
