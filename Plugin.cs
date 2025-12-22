@@ -92,12 +92,17 @@ namespace SilksongManager
                 _debugMenu?.ToggleMenu();
             }
 
-            // Process cheat systems every frame
-            Player.CheatSystem.Update();
-
             // Quick actions hotkeys
             HandleHotkeys();
         }
+
+        private void LateUpdate()
+        {
+            // Process cheat systems in LateUpdate so we run AFTER game's Update
+            // This ensures our onGround override happens after HeroController sets it
+            Player.CheatSystem.Update();
+        }
+
 
         private void HandleHotkeys()
         {
