@@ -344,7 +344,6 @@ namespace SilksongManager.Menu
         /// </summary>
         public static void HideMainMenu(UIManager ui)
         {
-            Plugin.Log.LogInfo("HideMainMenu called");
             ui.StartCoroutine(FadeOutSprite(ui.gameTitle));
 
             // Fade out subtitle
@@ -367,7 +366,6 @@ namespace SilksongManager.Menu
         /// </summary>
         public static void ShowMainMenu(UIManager ui)
         {
-            Plugin.Log.LogInfo("ShowMainMenu called");
             ui.StartCoroutine(FadeInSprite(ui.gameTitle));
 
             // Fade in subtitle
@@ -399,12 +397,14 @@ namespace SilksongManager.Menu
                 yield return null;
             }
             sprite.color = new Color(sprite.color.r, sprite.color.g, sprite.color.b, 0f);
+            sprite.enabled = false;
         }
 
         private static IEnumerator FadeInSprite(SpriteRenderer sprite)
         {
             if (sprite == null) yield break;
 
+            sprite.enabled = true;
             float alpha = sprite.color.a;
             while (alpha < 0.95f)
             {

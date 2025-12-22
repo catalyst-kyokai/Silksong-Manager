@@ -654,9 +654,11 @@ namespace SilksongManager.Menu.Keybinds
                 ui.mainMenuScreen.gameObject.SetActive(false);
 
                 // Also hide title/subtitle if they appeared
-                if (ui.gameTitle != null && ui.gameTitle.color.a > 0.1f)
+                // Also hide title/subtitle if they appeared
+                if (ui.gameTitle != null && (ui.gameTitle.color.a > 0.1f || ui.gameTitle.enabled))
                 {
                     ui.gameTitle.color = new Color(ui.gameTitle.color.r, ui.gameTitle.color.g, ui.gameTitle.color.b, 0f);
+                    ui.gameTitle.enabled = false;
                 }
             }
 
