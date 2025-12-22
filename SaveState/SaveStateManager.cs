@@ -7,6 +7,7 @@ using UnityEngine.SceneManagement;
 using Newtonsoft.Json;
 using BepInEx;
 using GlobalEnums;
+using HutongGames.PlayMaker;
 
 namespace SilksongManager.SaveState
 {
