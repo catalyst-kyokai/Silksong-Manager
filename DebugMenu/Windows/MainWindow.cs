@@ -65,7 +65,7 @@ namespace SilksongManager.DebugMenu.Windows
 
                 // Toggles status
                 DebugMenuStyles.DrawStatus("Invincibility", pd.isInvincible);
-                DebugMenuStyles.DrawStatus("Noclip", Player.PlayerActions.IsNoclipEnabled);
+                DebugMenuStyles.DrawStatus("Noclip", Player.CheatSystem.NoclipEnabled);
             }
             else
             {
@@ -100,10 +100,10 @@ namespace SilksongManager.DebugMenu.Windows
                 Player.PlayerActions.ToggleInvincibility();
             }
 
-            bool isNoclip = Player.PlayerActions.IsNoclipEnabled;
+            bool isNoclip = Player.CheatSystem.NoclipEnabled;
             if (DebugMenuStyles.DrawToggleButton(isNoclip ? "Noclip ✓" : "Noclip", isNoclip))
             {
-                Player.PlayerActions.ToggleNoclip();
+                Player.CheatSystem.ToggleNoclip();
             }
 
             GUILayout.EndHorizontal();
@@ -153,6 +153,11 @@ namespace SilksongManager.DebugMenu.Windows
             if (GUILayout.Button("Debug Info", DebugMenuStyles.Button))
             {
                 _controller.ToggleWindow<DebugInfoWindow>();
+            }
+
+            if (GUILayout.Button("Combat", DebugMenuStyles.Button))
+            {
+                _controller.ToggleWindow<CombatWindow>();
             }
 
             GUILayout.EndVertical();

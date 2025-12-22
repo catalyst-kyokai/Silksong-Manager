@@ -68,6 +68,10 @@ namespace SilksongManager
             // Initialize keybind manager with config file
             Menu.Keybinds.ModKeybindManager.Initialize(Config);
 
+            // Initialize cheat systems
+            Player.CheatSystem.Initialize(Config);
+            Damage.DamageSystem.Initialize(Config);
+
             // Initialize debug menu
             _debugMenu = gameObject.AddComponent<DebugMenu.DebugMenuController>();
 
@@ -85,6 +89,9 @@ namespace SilksongManager
                 _debugMenu?.ToggleMenu();
             }
 
+            // Process cheat systems every frame
+            Player.CheatSystem.Update();
+
             // Quick actions hotkeys
             HandleHotkeys();
         }
@@ -93,16 +100,34 @@ namespace SilksongManager
         {
             if (!ModConfig.EnableHotkeys) return;
 
-            // Toggle Noclip
+            // Toggle Noclip - use CheatSystem
             if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ToggleNoclip))
             {
-                Player.PlayerActions.ToggleNoclip();
+                Player.CheatSystem.ToggleNoclip();
             }
 
             // Toggle Invincibility
             if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ToggleInvincibility))
             {
                 Player.PlayerActions.ToggleInvincibility();
+            }
+
+            // Toggle Infinite Jumps
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ToggleInfiniteJumps))
+            {
+                Player.CheatSystem.ToggleInfiniteJumps();
+            }
+
+            // Toggle Infinite Health
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ToggleInfiniteHealth))
+            {
+                Player.CheatSystem.ToggleInfiniteHealth();
+            }
+
+            // Toggle Infinite Silk
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ToggleInfiniteSilk))
+            {
+                Player.CheatSystem.ToggleInfiniteSilk();
             }
 
             // Save Position
