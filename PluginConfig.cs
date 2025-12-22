@@ -9,6 +9,11 @@ namespace SilksongManager
     {
         private readonly ConfigFile _config;
 
+        /// <summary>
+        /// Exposes the raw ConfigFile for other modules.
+        /// </summary>
+        public ConfigFile ConfigFile => _config;
+
         // General Settings
         public bool EnableHotkeys { get; private set; }
         public bool ShowDebugInfo { get; private set; }

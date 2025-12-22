@@ -8,6 +8,44 @@ namespace SilksongManager.Enemies
     /// </summary>
     public static class EnemyActions
     {
+        private static bool _enemiesFrozen = false;
+
+        /// <summary>
+        /// Whether enemies are currently frozen.
+        /// </summary>
+        public static bool AreEnemiesFrozen => _enemiesFrozen;
+
+        /// <summary>
+        /// Get count of enemies in current scene.
+        /// </summary>
+        public static int GetEnemyCount()
+        {
+            var healthManagers = Object.FindObjectsOfType<HealthManager>();
+            int count = 0;
+            foreach (var hm in healthManagers)
+            {
+                if (hm != null && !hm.GetIsDead())
+                    count++;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Freeze or unfreeze enemies.
+        /// </summary>
+        public static void FreezeEnemies(bool freeze)
+        {
+            if (freeze)
+            {
+                FreezeAllEnemies();
+            }
+            else
+            {
+                UnfreezeAllEnemies();
+            }
+            _enemiesFrozen = freeze;
+        }
+
         /// <summary>
         /// Find all enemies in current scene.
         /// </summary>

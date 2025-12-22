@@ -108,7 +108,7 @@ namespace SilksongManager.Menu.Keybinds
         {
             if (!_initialized || !_keybindConfigs.ContainsKey(action))
                 return DefaultKeybinds.ContainsKey(action) ? DefaultKeybinds[action] : KeyCode.None;
-            
+
             return _keybindConfigs[action].Value;
         }
 
@@ -118,7 +118,7 @@ namespace SilksongManager.Menu.Keybinds
         public static void SetKeybind(ModAction action, KeyCode key)
         {
             if (!_initialized || !_keybindConfigs.ContainsKey(action)) return;
-            
+
             _keybindConfigs[action].Value = key;
             Plugin.Log.LogInfo($"Set keybind for {action} to {key}");
         }
