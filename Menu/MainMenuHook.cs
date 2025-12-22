@@ -16,6 +16,7 @@ namespace SilksongManager.Menu
         private static bool _initialized = false;
         private static GameObject _ssManagerButton;
         private static MenuScreen _modMenuScreen;
+        private static ModMenuController _menuController;
         private static bool _isInModMenu = false;
 
         /// <summary>
@@ -54,6 +55,7 @@ namespace SilksongManager.Menu
             _initialized = false;
             _ssManagerButton = null;
             _modMenuScreen = null;
+            _menuController = null;
             _isInModMenu = false;
         }
 
@@ -241,7 +243,35 @@ namespace SilksongManager.Menu
             // Show our menu screen
             yield return ui.StartCoroutine(ShowMenu(_modMenuScreen, ui));
 
+            // Activate our input controller
+            if (_menuController != null)
+            {
+                _menuController.SetActive(true);
+            }
+
             ih?.StartUIInput();
+        }
+
+        /// <summary>
+        /// Called by ModMenuController when Escape is pressed, or by back button.
+        /// </summary>
+        public static void HandleBackPressed()
+        {
+            if (!_isInModMenu) return;
+
+            Plugin.Log.LogInfo("HandleBackPressed called");
+
+            // Deactivate controller
+            if (_menuController != null)
+            {
+                _menuController.SetActive(false);
+            }
+
+            var ui = UIManager.instance;
+            if (ui != null)
+            {
+                ui.StartCoroutine(ReturnToMainMenu(ui));
+            }
         }
 
         public static IEnumerator ReturnToMainMenu(UIManager ui)
@@ -273,6 +303,12 @@ namespace SilksongManager.Menu
             catch { /* PlayMaker not available */ }
 
             ih?.StartUIInput();
+        }
+
+        private static void OnBackButtonPressed()
+        {
+            Plugin.Log.LogInfo("Back button pressed");
+            HandleBackPressed();
         }
 
         public static bool IsInModMenu => _isInModMenu;
@@ -399,6 +435,11 @@ namespace SilksongManager.Menu
                 return;
             }
 
+            // Log the template hierarchy for debugging
+            Plugin.Log.LogInfo("=== Template MenuScreen hierarchy ===");
+            LogHierarchy(templateScreen.transform, 0);
+            Plugin.Log.LogInfo("=== End hierarchy ===");
+
             // Clone the menu screen
             var screenObj = Object.Instantiate(templateScreen.gameObject, templateScreen.transform.parent);
             screenObj.name = "SSManagerMenuScreen";
@@ -410,6 +451,10 @@ namespace SilksongManager.Menu
                 Object.Destroy(screenObj);
                 return;
             }
+
+            // Add our input controller
+            _menuController = screenObj.AddComponent<ModMenuController>();
+            Plugin.Log.LogInfo("Added ModMenuController to menu screen");
 
             // Start hidden
             screenObj.SetActive(false);
@@ -424,6 +469,19 @@ namespace SilksongManager.Menu
             ModifyMenuScreenContent(screenObj);
 
             Plugin.Log.LogInfo("Mod menu screen created successfully!");
+        }
+
+        private static void LogHierarchy(Transform t, int depth)
+        {
+            string indent = new string(' ', depth * 2);
+            var components = t.GetComponents<Component>();
+            string compStr = string.Join(",", System.Array.ConvertAll(components, c => c?.GetType().Name ?? "null"));
+            Plugin.Log.LogInfo($"{indent}{t.name} [active={t.gameObject.activeSelf}] ({compStr})");
+
+            foreach (Transform child in t)
+            {
+                LogHierarchy(child, depth + 1);
+            }
         }
 
         private static void ModifyMenuScreenContent(GameObject screenObj)
@@ -582,17 +640,6 @@ namespace SilksongManager.Menu
         private static void OnKeybindsButtonPressed()
         {
             Plugin.Log.LogInfo("Keybinds button pressed - not yet implemented.");
-        }
-
-        private static void OnBackButtonPressed()
-        {
-            Plugin.Log.LogInfo("Back button pressed, returning to main menu.");
-
-            var ui = UIManager.instance;
-            if (ui != null)
-            {
-                ui.StartCoroutine(ReturnToMainMenu(ui));
-            }
         }
     }
 }
