@@ -13,28 +13,29 @@ namespace SilksongManager.Menu.Screens
         public SSManagerScreen() : base("SS Manager")
         {
         }
-        
+
         protected override void BuildContent()
         {
+            // Settings button - opens SettingsScreen with sliders/toggles
+            AddButton("Settings", () =>
+            {
+                MenuNavigation.Show(new SettingsScreen());
+            });
+
             // Keybinds button
             AddButton("Keybinds", () =>
             {
-                var keybindsScreen = new KeybindsMenuScreen();
-                MenuNavigation.Show(keybindsScreen);
+                MenuNavigation.Show(new KeybindsMenuScreen());
             });
-            
-            // Settings button - future expansion
-            // AddButton("Settings", () => { });
-            
-            // Debug Menu info
+
+            // Debug Menu info button
             AddButton("Debug Menu", () =>
             {
-                // Just show info - debug menu is toggled via hotkey
                 var key = ModKeybindManager.GetKeybind(ModAction.ToggleDebugMenu);
                 Plugin.Log.LogInfo($"Debug Menu is toggled via {key} key");
             });
         }
-        
+
         protected override void OnScreenShow(NavigationType navType)
         {
             Plugin.Log.LogInfo("SS Manager screen shown");
