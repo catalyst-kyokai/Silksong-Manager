@@ -952,6 +952,12 @@ namespace SilksongManager.Menu
                 _menuController.SetActive(false);
             }
 
+            // IMPORTANT: Ensure main menu is hidden
+            if (ui.mainMenuScreen != null)
+            {
+                ui.mainMenuScreen.gameObject.SetActive(false);
+            }
+
             var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
             yield return ui.StartCoroutine(FadeOutCanvasGroup(modCg, ui));
 
@@ -1015,6 +1021,12 @@ namespace SilksongManager.Menu
             if (_menuController != null)
             {
                 _menuController.SetActive(false);
+            }
+
+            // IMPORTANT: Ensure main menu is hidden
+            if (ui.mainMenuScreen != null)
+            {
+                ui.mainMenuScreen.gameObject.SetActive(false);
             }
 
             var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
