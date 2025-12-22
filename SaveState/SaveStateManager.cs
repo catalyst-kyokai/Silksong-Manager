@@ -83,33 +83,29 @@ namespace SilksongManager.SaveState
         {
             if (state == null) return;
 
-            string currentScene = SceneManager.GetActiveScene().name;
-
-            if (currentScene == state.SceneName)
+            // 1. Restore PlayerData IMMEDIATELY
+            // This is critical so that when the scene reloads, the world gen (enemies, bosses, walls)
+            // sees the correct flags (e.g., boss dead = false).
+            if (Plugin.PD != null && !string.IsNullOrEmpty(state.PlayerDataJson))
             {
-                // Instant load
-                ApplyStateImmediate(state);
+                JsonConvert.PopulateObject(state.PlayerDataJson, Plugin.PD);
             }
-            else
-            {
-                // Cross-scene load
-                _pendingLoadState = state;
-                Plugin.Log.LogInfo($"Loading cross-scene state: {state.SceneName}");
 
-                // Use WorldActions to load scene safely
-                // Or just SceneManager if we want raw speed, but Game manager usually handles transitions
-                // Let's use GameManager to be safe with UI
-                Plugin.GM.BeginSceneTransition(new GameManager.SceneLoadInfo
-                {
-                    SceneName = state.SceneName,
-                    EntryGateName = "door1", // Dummy gate, we will teleport anyway
-                    HeroLeaveDirection = GlobalEnums.GatePosition.unknown,
-                    EntryDelay = 0f,
-                    WaitForSceneTransitionCameraFade = false,
-                    Visualization = GameManager.SceneLoadVisualizations.Default,
-                    PreventCameraFadeOut = true
-                });
-            }
+            // 2. Force Scene Reload
+            // We always trigger a transition, even if in the same scene, to reset the world state.
+            _pendingLoadState = state;
+            Plugin.Log.LogInfo($"Loading state (forcing reload): {state.SceneName}");
+
+            Plugin.GM.BeginSceneTransition(new GameManager.SceneLoadInfo
+            {
+                SceneName = state.SceneName,
+                EntryGateName = "door1", // Dummy gate, we will teleport anyway
+                HeroLeaveDirection = GlobalEnums.GatePosition.unknown,
+                EntryDelay = 0f,
+                WaitForSceneTransitionCameraFade = false,
+                Visualization = GameManager.SceneLoadVisualizations.Default,
+                PreventCameraFadeOut = true
+            });
         }
 
         public static void DeleteState(SaveStateData state)
