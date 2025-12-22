@@ -80,10 +80,27 @@ namespace SilksongManager.DebugMenu.Windows
 
         protected BaseWindow()
         {
-            var defaultPos = GetDefaultPosition();
-            WindowRect = new Rect(defaultPos.x, defaultPos.y, DefaultSize.x, DefaultSize.y);
-            IsVisible = false;
+            // Load saved state or use defaults
+            LoadState();
+        }
+
+        /// <summary>
+        /// Load window state from config.
+        /// </summary>
+        public void LoadState()
+        {
+            var state = DebugMenuConfig.GetWindowState(WindowId, GetDefaultPosition(), DefaultSize);
+            WindowRect = new Rect(state.Position.x, state.Position.y, state.Size.x, state.Size.y);
+            IsVisible = state.IsVisible;
             IsDetached = false;
+        }
+
+        /// <summary>
+        /// Save window state to config.
+        /// </summary>
+        public void SaveState()
+        {
+            DebugMenuConfig.SaveWindowState(WindowId, WindowRect, IsVisible);
         }
 
         /// <summary>
@@ -318,6 +335,7 @@ namespace SilksongManager.DebugMenu.Windows
         public void Hide()
         {
             IsVisible = false;
+            SaveState();
         }
 
         /// <summary>

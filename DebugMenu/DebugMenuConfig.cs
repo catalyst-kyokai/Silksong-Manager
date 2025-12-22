@@ -1,119 +1,210 @@
 using BepInEx.Configuration;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace SilksongManager.DebugMenu
 {
     /// <summary>
-    /// Configuration for the debug menu.
+    /// Configuration for the debug menu with window state persistence.
     /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class DebugMenuConfig
     {
+        private static ConfigFile _config;
         private static ConfigEntry<float> _backgroundOpacity;
         private static ConfigEntry<float> _fullMenuOpacity;
         private static ConfigEntry<OpacityMode> _opacityMode;
-        private static ConfigEntry<float> _mainWindowX;
-        private static ConfigEntry<float> _mainWindowY;
-        
+        private static ConfigEntry<bool> _pauseGameOnMenu;
+
+        // Window state storage
+        private static Dictionary<int, ConfigEntry<string>> _windowStates = new Dictionary<int, ConfigEntry<string>>();
+
         private static bool _initialized = false;
-        
-        /// <summary>
-        /// Opacity mode determines what gets transparency applied.
-        /// </summary>
+
         public enum OpacityMode
         {
             BackgroundOnly,
             FullMenu
         }
-        
-        /// <summary>
-        /// Initialize config entries.
-        /// </summary>
+
         public static void Initialize(ConfigFile config)
         {
             if (_initialized) return;
-            
+            _config = config;
+
             _backgroundOpacity = config.Bind(
                 "DebugMenu",
                 "BackgroundOpacity",
                 0.9f,
                 new ConfigDescription("Opacity of window backgrounds (0-1)", new AcceptableValueRange<float>(0f, 1f))
             );
-            
+
             _fullMenuOpacity = config.Bind(
                 "DebugMenu",
-                "FullMenuOpacity", 
+                "FullMenuOpacity",
                 1f,
                 new ConfigDescription("Opacity of entire menu including text (0-1)", new AcceptableValueRange<float>(0.3f, 1f))
             );
-            
+
             _opacityMode = config.Bind(
                 "DebugMenu",
                 "OpacityMode",
                 OpacityMode.BackgroundOnly,
                 "Whether transparency applies to background only or entire menu"
             );
-            
-            _mainWindowX = config.Bind(
-                "DebugMenu.Windows",
-                "MainWindowX",
-                20f,
-                "X position of main window"
+
+            _pauseGameOnMenu = config.Bind(
+                "DebugMenu",
+                "PauseGameOnMenu",
+                false,
+                "Pause the game when debug menu is opened"
             );
-            
-            _mainWindowY = config.Bind(
-                "DebugMenu.Windows",
-                "MainWindowY",
-                20f,
-                "Y position of main window"
-            );
-            
+
             _initialized = true;
         }
-        
+
         // Accessors
         public static float BackgroundOpacity
         {
             get => _backgroundOpacity?.Value ?? 0.9f;
             set { if (_backgroundOpacity != null) _backgroundOpacity.Value = value; }
         }
-        
+
         public static float FullMenuOpacity
         {
             get => _fullMenuOpacity?.Value ?? 1f;
             set { if (_fullMenuOpacity != null) _fullMenuOpacity.Value = value; }
         }
-        
+
         public static OpacityMode CurrentOpacityMode
         {
             get => _opacityMode?.Value ?? OpacityMode.BackgroundOnly;
             set { if (_opacityMode != null) _opacityMode.Value = value; }
         }
-        
+
+        public static bool PauseGameOnMenu
+        {
+            get => _pauseGameOnMenu?.Value ?? false;
+            set { if (_pauseGameOnMenu != null) _pauseGameOnMenu.Value = value; }
+        }
+
         public static Vector2 MainWindowPosition
         {
-            get => new Vector2(_mainWindowX?.Value ?? 20f, _mainWindowY?.Value ?? 20f);
-            set
-            {
-                if (_mainWindowX != null) _mainWindowX.Value = value.x;
-                if (_mainWindowY != null) _mainWindowY.Value = value.y;
-            }
+            get => GetWindowState(10001).Position;
+            set => SaveWindowPosition(10001, value);
         }
-        
-        /// <summary>
-        /// Get the effective GUI.color alpha based on opacity mode.
-        /// </summary>
+
         public static float GetEffectiveAlpha()
         {
             return CurrentOpacityMode == OpacityMode.FullMenu ? FullMenuOpacity : 1f;
         }
-        
-        /// <summary>
-        /// Get the effective background alpha.
-        /// </summary>
+
         public static float GetBackgroundAlpha()
         {
             return BackgroundOpacity;
         }
+
+        #region Window State Persistence
+
+        /// <summary>
+        /// Window state stored as "x,y,w,h,visible"
+        /// </summary>
+        public struct WindowState
+        {
+            public Vector2 Position;
+            public Vector2 Size;
+            public bool IsVisible;
+
+            public override string ToString()
+            {
+                return $"{Position.x:F0},{Position.y:F0},{Size.x:F0},{Size.y:F0},{(IsVisible ? 1 : 0)}";
+            }
+
+            public static WindowState Parse(string s, Vector2 defaultPos, Vector2 defaultSize)
+            {
+                var state = new WindowState
+                {
+                    Position = defaultPos,
+                    Size = defaultSize,
+                    IsVisible = false
+                };
+
+                if (string.IsNullOrEmpty(s)) return state;
+
+                var parts = s.Split(',');
+                if (parts.Length >= 5)
+                {
+                    if (float.TryParse(parts[0], out float x)) state.Position.x = x;
+                    if (float.TryParse(parts[1], out float y)) state.Position.y = y;
+                    if (float.TryParse(parts[2], out float w)) state.Size.x = Mathf.Max(200, w);
+                    if (float.TryParse(parts[3], out float h)) state.Size.y = Mathf.Max(150, h);
+                    if (int.TryParse(parts[4], out int v)) state.IsVisible = v == 1;
+                }
+
+                return state;
+            }
+        }
+
+        public static WindowState GetWindowState(int windowId)
+        {
+            return GetWindowState(windowId, new Vector2(20, 20), new Vector2(280, 300));
+        }
+
+        public static WindowState GetWindowState(int windowId, Vector2 defaultPos, Vector2 defaultSize)
+        {
+            if (_config == null) return new WindowState { Position = defaultPos, Size = defaultSize, IsVisible = false };
+
+            if (!_windowStates.TryGetValue(windowId, out var entry))
+            {
+                entry = _config.Bind(
+                    "DebugMenu.WindowStates",
+                    $"Window_{windowId}",
+                    "",
+                    $"State for window {windowId}: x,y,width,height,visible"
+                );
+                _windowStates[windowId] = entry;
+            }
+
+            return WindowState.Parse(entry.Value, defaultPos, defaultSize);
+        }
+
+        public static void SaveWindowState(int windowId, Rect rect, bool isVisible)
+        {
+            if (_config == null) return;
+
+            if (!_windowStates.TryGetValue(windowId, out var entry))
+            {
+                entry = _config.Bind(
+                    "DebugMenu.WindowStates",
+                    $"Window_{windowId}",
+                    "",
+                    $"State for window {windowId}: x,y,width,height,visible"
+                );
+                _windowStates[windowId] = entry;
+            }
+
+            var state = new WindowState
+            {
+                Position = new Vector2(rect.x, rect.y),
+                Size = new Vector2(rect.width, rect.height),
+                IsVisible = isVisible
+            };
+
+            entry.Value = state.ToString();
+        }
+
+        public static void SaveWindowPosition(int windowId, Vector2 pos)
+        {
+            var state = GetWindowState(windowId);
+            state.Position = pos;
+
+            if (_windowStates.TryGetValue(windowId, out var entry))
+            {
+                entry.Value = state.ToString();
+            }
+        }
+
+        #endregion
     }
 }
+

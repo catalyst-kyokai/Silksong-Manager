@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 using SilksongManager.DebugMenu.Windows;
 using SilksongManager.Menu.Keybinds;
@@ -15,6 +17,11 @@ namespace SilksongManager.DebugMenu
         private bool _isVisible = false;
         private bool _previousCursorVisible;
         private CursorLockMode _previousCursorLockState;
+        private float _previousTimeScale = 1f;
+
+        // Reflection cache for cursor fix
+        private static FieldInfo _controllerPressedField;
+        private static bool _reflectionInitialized = false;
 
         private List<BaseWindow> _windows;
         private MainWindow _mainWindow;
@@ -29,7 +36,10 @@ namespace SilksongManager.DebugMenu
             // Initialize config
             DebugMenuConfig.Initialize(Plugin.ModConfig.ConfigFile);
 
-            // Create windows
+            // Initialize reflection for cursor fix
+            InitializeReflection();
+
+            // Create windows (they will load their saved states)
             _windows = new List<BaseWindow>();
 
             _mainWindow = new MainWindow(this);
@@ -46,6 +56,32 @@ namespace SilksongManager.DebugMenu
             Plugin.Log.LogInfo("DebugMenuController initialized with " + _windows.Count + " windows");
         }
 
+        private static void InitializeReflection()
+        {
+            if (_reflectionInitialized) return;
+
+            try
+            {
+                // Get the _controllerPressed field from InputHandler
+                var inputHandlerType = typeof(InputHandler);
+                _controllerPressedField = inputHandlerType.GetField(
+                    "_controllerPressed",
+                    BindingFlags.NonPublic | BindingFlags.Static
+                );
+
+                if (_controllerPressedField != null)
+                {
+                    Plugin.Log.LogInfo("Found InputHandler._controllerPressed field for cursor fix");
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning($"Could not find _controllerPressed field: {e.Message}");
+            }
+
+            _reflectionInitialized = true;
+        }
+
         private void Update()
         {
             // Update all windows (for keybind checks)
@@ -58,7 +94,6 @@ namespace SilksongManager.DebugMenu
         private void LateUpdate()
         {
             // Force cursor visibility every frame while menu is open
-            // This overrides the game's InputHandler which hides cursor during gameplay
             if (_isVisible)
             {
                 ForceCursorVisible();
@@ -66,27 +101,32 @@ namespace SilksongManager.DebugMenu
         }
 
         /// <summary>
-        /// Force the cursor to be visible, overriding game systems.
+        /// Force the cursor to be visible by manipulating game's internal state.
         /// </summary>
         private void ForceCursorVisible()
         {
+            // Method 1: Direct cursor control
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
 
-            // Also try to tell InputHandler that we want cursor visible
-            // This helps with the game's internal state
+            // Method 2: Set _controllerPressed = false via reflection
+            // This makes InputHandler.SetCursorVisible(!_controllerPressed) show cursor
             try
             {
-                var ih = GameManager.instance?.inputHandler;
-                if (ih != null)
+                if (_controllerPressedField != null)
                 {
-                    // Force the internal state - invoke cursor visibility change event
-                    // This makes the game's UI input module work properly
-                    var uiManager = UIManager.instance;
-                    if (uiManager != null && uiManager.inputModule != null)
-                    {
-                        uiManager.inputModule.allowMouseInput = true;
-                    }
+                    _controllerPressedField.SetValue(null, false);
+                }
+            }
+            catch { }
+
+            // Method 3: Enable UI mouse input
+            try
+            {
+                var uiManager = UIManager.instance;
+                if (uiManager?.inputModule != null)
+                {
+                    uiManager.inputModule.allowMouseInput = true;
                 }
             }
             catch { }
@@ -95,6 +135,10 @@ namespace SilksongManager.DebugMenu
         private void OnGUI()
         {
             if (!_isVisible) return;
+
+            // Force cursor visible during OnGUI as well
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
 
             // Ensure styles are initialized
             DebugMenuStyles.EnsureInitialized();
@@ -130,15 +174,22 @@ namespace SilksongManager.DebugMenu
 
             _isVisible = true;
 
-            // Save cursor state
+            // Save states
             _previousCursorVisible = Cursor.visible;
             _previousCursorLockState = Cursor.lockState;
+            _previousTimeScale = Time.timeScale;
 
-            // Show cursor
-            Cursor.visible = true;
-            Cursor.lockState = CursorLockMode.None;
+            // Force cursor visible
+            ForceCursorVisible();
 
-            // Show main window
+            // Pause game if option enabled
+            if (DebugMenuConfig.PauseGameOnMenu)
+            {
+                Time.timeScale = 0f;
+            }
+
+            // Show all windows that were visible before (they load their state on construct)
+            // Main window always shows
             _mainWindow?.Show();
 
             Plugin.Log.LogInfo("Debug menu opened");
@@ -153,9 +204,21 @@ namespace SilksongManager.DebugMenu
 
             _isVisible = false;
 
+            // Save all window states before hiding
+            foreach (var window in _windows)
+            {
+                window.SaveState();
+            }
+
             // Restore cursor state
             Cursor.visible = _previousCursorVisible;
             Cursor.lockState = _previousCursorLockState;
+
+            // Restore time scale if we paused
+            if (DebugMenuConfig.PauseGameOnMenu)
+            {
+                Time.timeScale = _previousTimeScale;
+            }
 
             // Hide all windows
             foreach (var window in _windows)
@@ -188,3 +251,4 @@ namespace SilksongManager.DebugMenu
         }
     }
 }
+
