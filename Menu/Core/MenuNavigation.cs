@@ -213,7 +213,7 @@ namespace SilksongManager.Menu.Core
         }
 
         /// <summary>
-        /// Hide main menu (CanvasGroup) with fade.
+        /// Hide main menu (CanvasGroup) with fade - also hides gameTitle logo.
         /// </summary>
         private static IEnumerator HideMainMenu(UIManager ui)
         {
@@ -221,6 +221,12 @@ namespace SilksongManager.Menu.Core
             if (mainMenu == null) yield break;
 
             mainMenu.interactable = false;
+
+            // Also hide the game title logo
+            if (ui.gameTitle != null)
+            {
+                ui.gameTitle.gameObject.SetActive(false);
+            }
 
             // Fade out
             float duration = 0.2f;
@@ -248,6 +254,12 @@ namespace SilksongManager.Menu.Core
 
             mainMenu.gameObject.SetActive(true);
             mainMenu.alpha = 0f;
+
+            // Also show the game title logo
+            if (ui.gameTitle != null)
+            {
+                ui.gameTitle.gameObject.SetActive(true);
+            }
 
             // Fade in
             float duration = 0.2f;

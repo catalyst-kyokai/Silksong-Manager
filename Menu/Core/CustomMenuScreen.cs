@@ -16,63 +16,63 @@ namespace SilksongManager.Menu.Core
         /// Root container GameObject for this screen.
         /// </summary>
         public GameObject Container { get; private set; }
-        
+
         /// <summary>
         /// The MenuScreen component.
         /// </summary>
         public MenuScreen MenuScreen { get; private set; }
-        
+
         /// <summary>
         /// Title text element.
         /// </summary>
         public Text TitleText { get; private set; }
-        
+
         /// <summary>
         /// Content pane where menu elements are added.
         /// </summary>
         public GameObject ContentPane { get; private set; }
-        
+
         /// <summary>
         /// Controls pane (contains back button).
         /// </summary>
         public GameObject ControlsPane { get; private set; }
-        
+
         /// <summary>
         /// Back button at bottom of screen.
         /// </summary>
         public MenuButton BackButton { get; private set; }
-        
+
         /// <summary>
         /// If false, back button won't navigate back.
         /// </summary>
         public bool AllowGoBack { get; set; } = true;
-        
+
         /// <summary>
         /// Screen title.
         /// </summary>
         public string Title { get; }
-        
+
         /// <summary>
         /// Event fired when screen is shown.
         /// </summary>
         public event Action<NavigationType> OnShow;
-        
+
         /// <summary>
         /// Event fired when screen is hidden.
         /// </summary>
         public event Action<NavigationType> OnHide;
-        
+
         /// <summary>
         /// Event fired when back button is pressed.
         /// </summary>
         public event Action OnBackPressed;
-        
+
         protected CustomMenuScreen(string title)
         {
             Title = title;
             CreateScreen();
         }
-        
+
         private void CreateScreen()
         {
             Container = MenuTemplates.CreateMenuScreen(Title);
@@ -81,12 +81,28 @@ namespace SilksongManager.Menu.Core
                 Plugin.Log.LogError($"CustomMenuScreen: Failed to create screen '{Title}'");
                 return;
             }
-            
+
             MenuScreen = Container.GetComponent<MenuScreen>();
             TitleText = MenuTemplates.FindChild(Container, "Title")?.GetComponent<Text>();
             ContentPane = MenuTemplates.FindChild(Container, "Content");
             ControlsPane = MenuTemplates.FindChild(Container, "Controls");
-            
+
+            // Add VerticalLayoutGroup to ContentPane for proper button stacking
+            if (ContentPane != null)
+            {
+                var vlg = ContentPane.GetComponent<VerticalLayoutGroup>();
+                if (vlg == null)
+                {
+                    vlg = ContentPane.AddComponent<VerticalLayoutGroup>();
+                }
+                vlg.childAlignment = TextAnchor.UpperCenter;
+                vlg.spacing = 20f;
+                vlg.childControlWidth = false;
+                vlg.childControlHeight = false;
+                vlg.childForceExpandWidth = false;
+                vlg.childForceExpandHeight = false;
+            }
+
             // Find and setup back button
             var applyBtn = MenuTemplates.FindChild(ControlsPane, "ApplyButton");
             if (applyBtn != null)
@@ -96,7 +112,7 @@ namespace SilksongManager.Menu.Core
                 {
                     MenuScreen.backButton = BackButton;
                 }
-                
+
                 // Set back button click handler
                 var eventTrigger = applyBtn.GetComponent<EventTrigger>();
                 if (eventTrigger != null)
@@ -109,7 +125,7 @@ namespace SilksongManager.Menu.Core
                     entry.callback.AddListener((data) => MenuNavigation.HandleBackPressed());
                     eventTrigger.triggers.Add(entry);
                 }
-                
+
                 // Set back button text
                 var backText = MenuTemplates.FindChild(applyBtn, "Menu Button Text");
                 if (backText != null)
@@ -119,7 +135,7 @@ namespace SilksongManager.Menu.Core
                     {
                         textComp.text = "Back";
                     }
-                    
+
                     // Remove localization
                     var localize = backText.GetComponent<AutoLocalizeTextUI>();
                     if (localize != null)
@@ -128,22 +144,22 @@ namespace SilksongManager.Menu.Core
                     }
                 }
             }
-            
+
             // Add destroy callback
             Container.AddComponent<OnDestroyCallback>().OnDestroyed += () =>
             {
                 OnDispose();
             };
-            
+
             // Build content
             BuildContent();
         }
-        
+
         /// <summary>
         /// Override to add content elements to the screen.
         /// </summary>
         protected abstract void BuildContent();
-        
+
         /// <summary>
         /// Add a text button to the content pane.
         /// </summary>
@@ -157,7 +173,7 @@ namespace SilksongManager.Menu.Core
             }
             return button;
         }
-        
+
         /// <summary>
         /// Called when screen is being shown.
         /// </summary>
@@ -166,7 +182,7 @@ namespace SilksongManager.Menu.Core
             OnShow?.Invoke(navType);
             OnScreenShow(navType);
         }
-        
+
         /// <summary>
         /// Called when screen is being hidden.
         /// </summary>
@@ -175,7 +191,7 @@ namespace SilksongManager.Menu.Core
             OnHide?.Invoke(navType);
             OnScreenHide(navType);
         }
-        
+
         /// <summary>
         /// Called when back button is pressed.
         /// </summary>
@@ -184,27 +200,27 @@ namespace SilksongManager.Menu.Core
             OnBackPressed?.Invoke();
             OnBack();
         }
-        
+
         /// <summary>
         /// Override for custom show behavior.
         /// </summary>
         protected virtual void OnScreenShow(NavigationType navType) { }
-        
+
         /// <summary>
         /// Override for custom hide behavior.
         /// </summary>
         protected virtual void OnScreenHide(NavigationType navType) { }
-        
+
         /// <summary>
         /// Override for custom back button behavior.
         /// </summary>
         protected virtual void OnBack() { }
-        
+
         /// <summary>
         /// Called when screen is destroyed.
         /// </summary>
         protected virtual void OnDispose() { }
-        
+
         /// <summary>
         /// Destroy this screen.
         /// </summary>
