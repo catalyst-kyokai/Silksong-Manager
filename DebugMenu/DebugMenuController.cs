@@ -18,6 +18,7 @@ namespace SilksongManager.DebugMenu
         private bool _previousCursorVisible;
         private CursorLockMode _previousCursorLockState;
         private float _previousTimeScale = 1f;
+        private bool _pausedByUs = false;  // Track if WE paused the game
 
         // Reflection cache for cursor fix
         private static FieldInfo _controllerPressedField;
@@ -185,7 +186,12 @@ namespace SilksongManager.DebugMenu
             // Pause game if option enabled
             if (DebugMenuConfig.PauseGameOnMenu)
             {
+                _pausedByUs = true;
                 Time.timeScale = 0f;
+            }
+            else
+            {
+                _pausedByUs = false;
             }
 
             // Restore all windows to their saved visibility states
@@ -226,10 +232,11 @@ namespace SilksongManager.DebugMenu
             Cursor.visible = _previousCursorVisible;
             Cursor.lockState = _previousCursorLockState;
 
-            // Always restore time scale if we paused it
-            if (DebugMenuConfig.PauseGameOnMenu && Time.timeScale == 0f)
+            // Restore time scale if WE paused it
+            if (_pausedByUs && Time.timeScale == 0f)
             {
                 Time.timeScale = _previousTimeScale > 0f ? _previousTimeScale : 1f;
+                _pausedByUs = false;
             }
 
             // Hide all windows WITHOUT saving (already saved above)
