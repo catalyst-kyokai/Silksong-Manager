@@ -269,13 +269,13 @@ namespace SilksongManager.Menu.Keybinds
             colRect.offsetMax = Vector2.zero;
 
             var layout = colObj.AddComponent<VerticalLayoutGroup>();
-            layout.childAlignment = TextAnchor.UpperLeft;
-            layout.spacing = 8;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.spacing = 20;
             layout.childControlHeight = false;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
             layout.childForceExpandWidth = true;
-            layout.padding = new RectOffset(10, 10, 10, 10);
+            layout.padding = new RectOffset(10, 10, 20, 20);
 
             return colObj.transform;
         }
@@ -286,12 +286,12 @@ namespace SilksongManager.Menu.Keybinds
             entryObj.transform.SetParent(parent, false);
 
             var entryRect = entryObj.AddComponent<RectTransform>();
-            entryRect.sizeDelta = new Vector2(0, 40);
+            entryRect.sizeDelta = new Vector2(0, 55);
 
-            // Horizontal layout like game
+            // Horizontal layout like game: label  [key]
             var hLayout = entryObj.AddComponent<HorizontalLayoutGroup>();
-            hLayout.childAlignment = TextAnchor.MiddleLeft;
-            hLayout.spacing = 20;
+            hLayout.childAlignment = TextAnchor.MiddleRight;
+            hLayout.spacing = 15;
             hLayout.childControlWidth = false;
             hLayout.childControlHeight = true;
             hLayout.childForceExpandWidth = false;
@@ -300,14 +300,14 @@ namespace SilksongManager.Menu.Keybinds
             var labelObj = new GameObject("Label");
             labelObj.transform.SetParent(entryObj.transform, false);
             var labelRect = labelObj.AddComponent<RectTransform>();
-            labelRect.sizeDelta = new Vector2(160, 35);
+            labelRect.sizeDelta = new Vector2(200, 45);
             var labelLayout = labelObj.AddComponent<LayoutElement>();
-            labelLayout.preferredWidth = 160;
+            labelLayout.preferredWidth = 200;
 
             var labelText = labelObj.AddComponent<Text>();
             labelText.font = GetGameFont();
-            labelText.fontSize = 20;
-            labelText.fontStyle = FontStyle.Bold;
+            labelText.fontSize = 26;
+            labelText.fontStyle = FontStyle.Normal;
             labelText.alignment = TextAnchor.MiddleRight;
             labelText.color = Color.white;
             labelText.text = ModKeybindManager.GetActionName(action);
@@ -316,10 +316,10 @@ namespace SilksongManager.Menu.Keybinds
             var keyBtnObj = new GameObject("KeyButton");
             keyBtnObj.transform.SetParent(entryObj.transform, false);
             var keyRect = keyBtnObj.AddComponent<RectTransform>();
-            keyRect.sizeDelta = new Vector2(80, 35);
+            keyRect.sizeDelta = new Vector2(70, 45);
             var keyLayout = keyBtnObj.AddComponent<LayoutElement>();
-            keyLayout.preferredWidth = 80;
-            keyLayout.preferredHeight = 35;
+            keyLayout.preferredWidth = 70;
+            keyLayout.preferredHeight = 45;
 
             // Background image (styled like game keys)
             var uibs = UIManager.instance?.uiButtonSkins;
@@ -328,7 +328,7 @@ namespace SilksongManager.Menu.Keybinds
             keyBg.color = Color.white;
             keyBg.type = Image.Type.Sliced;
 
-            // Key text
+            // Key text - WHITE color like game
             var keyTextObj = new GameObject("Text");
             keyTextObj.transform.SetParent(keyBtnObj.transform, false);
             var keyTextRect = keyTextObj.AddComponent<RectTransform>();
@@ -339,10 +339,10 @@ namespace SilksongManager.Menu.Keybinds
 
             var keyText = keyTextObj.AddComponent<Text>();
             keyText.font = GetGameFont();
-            keyText.fontSize = 18;
+            keyText.fontSize = 24;
             keyText.fontStyle = FontStyle.Bold;
             keyText.alignment = TextAnchor.MiddleCenter;
-            keyText.color = Color.black;
+            keyText.color = Color.white;  // WHITE text like game
 
             // Add button component
             var button = keyBtnObj.AddComponent<MenuButton>();
@@ -566,6 +566,9 @@ namespace SilksongManager.Menu.Keybinds
             _isActive = true;
             RefreshAllDisplays();
 
+            // HIDE main menu elements
+            HideMainMenuElements(ui);
+
             var cg = _keybindsMenuScreen.GetComponent<CanvasGroup>();
             _keybindsMenuScreen.gameObject.SetActive(true);
 
@@ -591,11 +594,45 @@ namespace SilksongManager.Menu.Keybinds
             }
         }
 
+        private static void HideMainMenuElements(UIManager ui)
+        {
+            // Hide main menu options
+            var mainMenuOptions = Object.FindAnyObjectByType<MainMenuOptions>();
+            if (mainMenuOptions != null)
+            {
+                mainMenuOptions.gameObject.SetActive(false);
+            }
+
+            // Hide any visible menu screens
+            if (ui.mainMenuScreen != null)
+            {
+                var mainCg = ui.mainMenuScreen.GetComponent<CanvasGroup>();
+                if (mainCg != null)
+                {
+                    mainCg.alpha = 0f;
+                    mainCg.interactable = false;
+                }
+            }
+        }
+
+        private static void ShowMainMenuElements(UIManager ui)
+        {
+            // Show main menu options
+            var mainMenuOptions = Object.FindAnyObjectByType<MainMenuOptions>();
+            if (mainMenuOptions != null)
+            {
+                mainMenuOptions.gameObject.SetActive(true);
+            }
+        }
+
         public static IEnumerator Hide(UIManager ui)
         {
             if (_keybindsMenuScreen == null) yield break;
 
             _isActive = false;
+
+            // Restore main menu elements
+            ShowMainMenuElements(ui);
 
             var cg = _keybindsMenuScreen.GetComponent<CanvasGroup>();
             if (cg != null)
