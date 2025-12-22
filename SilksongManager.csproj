@@ -83,6 +83,10 @@
       <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="PlayMaker">
       <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\PlayMaker.dll</HintPath>
       <Private>false</Private>
