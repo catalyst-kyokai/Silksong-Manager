@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Newtonsoft.Json;
@@ -131,7 +132,7 @@ namespace SilksongManager.SaveState
                 // 3. Restore Hero State
                 var hero = Plugin.Hero;
                 var heroType = hero.GetType();
-                var bindingFlags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public;
+                var bindingFlags = BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public;
 
                 // Force Reset State
                 hero.StopAnimationControl();
@@ -178,9 +179,21 @@ namespace SilksongManager.SaveState
                 if (state.IsGrounded)
                 {
                     hero.cState.onGround = true;
+                    // Force Zero Velocity to prevent popping/sliding
+                    hero.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
+
                     if (setState != null)
                         setState.Invoke(hero, new object[] { GlobalEnums.ActorStates.grounded });
                     anim.PlayClip("Idle");
+
+                    // Force ProxyFSM to Idle
+                    var proxyFSMField = heroType.GetField("proxyFSM", bindingFlags);
+                    if (proxyFSMField != null)
+                    {
+                        var proxyFSM = proxyFSMField.GetValue(hero) as PlayMakerFSM;
+                        if (proxyFSM != null)
+                            proxyFSM.SendEvent("HeroCtrl-Idle");
+                    }
                 }
                 else
                 {
@@ -189,6 +202,10 @@ namespace SilksongManager.SaveState
                         setState.Invoke(hero, new object[] { GlobalEnums.ActorStates.airborne });
                     anim.PlayClip("Fall");
                 }
+
+                // Reset Transition State explicitly
+                hero.transitionState = HeroTransitionState.WAITING_TO_TRANSITION;
+                hero.cState.transitioning = false;
 
                 Plugin.Log.LogInfo("State applied successfully!");
             }
