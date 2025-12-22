@@ -154,20 +154,26 @@ namespace SilksongManager.Menu
                 return;
             }
 
-            // Calculate the spacing between buttons
+            // Calculate the spacing between buttons (Extras is above Quit, so Extras.y > Quit.y)
             float spacing = extrasRect.anchoredPosition.y - quitRect.anchoredPosition.y;
 
-            // Position our button where Quit currently is
-            var quitOriginalPos = quitRect.anchoredPosition;
-            ssRect.anchoredPosition = quitOriginalPos;
+            // Position SS Manager between Extras and Quit:
+            // SS Manager takes position between Extras and Quit
+            float ssManagerY = extrasRect.anchoredPosition.y - spacing;
+            ssRect.anchoredPosition = new Vector2(extrasRect.anchoredPosition.x, ssManagerY);
 
-            // Move Quit button down by the same spacing
-            quitRect.anchoredPosition = new Vector2(quitOriginalPos.x, quitOriginalPos.y - spacing);
+            // Move Quit button down by the same spacing to make room
+            quitRect.anchoredPosition = new Vector2(quitRect.anchoredPosition.x, quitRect.anchoredPosition.y - spacing);
+
+            // IMPORTANT: Set sibling index to place button in correct visual order
+            // Get quit button's sibling index and place our button just before it
+            int quitSiblingIndex = quitButton.transform.GetSiblingIndex();
+            ssManagerButton.transform.SetSiblingIndex(quitSiblingIndex);
 
             // Setup navigation: Extras -> SSManager -> Quit
             SetupNavigation(extrasButton, ssManagerButton, quitButton);
 
-            Plugin.Log.LogInfo($"Button positioned at Y={ssRect.anchoredPosition.y}, Quit moved to Y={quitRect.anchoredPosition.y}");
+            Plugin.Log.LogInfo($"Button positioned at Y={ssRect.anchoredPosition.y}, Quit moved to Y={quitRect.anchoredPosition.y}, Sibling index={quitSiblingIndex}");
         }
 
         private static void SetupNavigation(MenuButton extrasButton, MenuButton ssManagerButton, MenuButton quitButton)
@@ -421,65 +427,131 @@ namespace SilksongManager.Menu
 
         private static void ModifyMenuScreenContent(GameObject screenObj)
         {
-            // Find and modify the title text
-            var texts = screenObj.GetComponentsInChildren<Text>(true);
-            foreach (var text in texts)
-            {
-                // Change title
-                if (text.gameObject.name.Contains("Title") || text.text.Contains("Extra"))
-                {
-                    DisableLocalization(text.gameObject);
-                    text.text = "SS Manager";
-                }
-            }
+            Plugin.Log.LogInfo("Modifying cloned menu screen content...");
 
-            // Same for TMPro
+            // Step 1: Find all TMPro texts and change/hide them
             var tmpTexts = screenObj.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
             foreach (var text in tmpTexts)
             {
-                if (text.gameObject.name.Contains("Title") || text.text.Contains("Extra"))
+                var objName = text.gameObject.name.ToLower();
+
+                // Change title
+                if (objName.Contains("title"))
                 {
                     DisableLocalization(text.gameObject);
                     text.text = "SS Manager";
+                    Plugin.Log.LogInfo($"Changed title: {text.gameObject.name}");
+                }
+                // Hide any other text that isn't part of a button
+                else if (!objName.Contains("button") && !objName.Contains("back"))
+                {
+                    var parentButton = text.GetComponentInParent<MenuButton>();
+                    if (parentButton == null)
+                    {
+                        text.gameObject.SetActive(false);
+                        Plugin.Log.LogInfo($"Hid text: {text.gameObject.name}");
+                    }
                 }
             }
 
-            // Find existing buttons and repurpose them
+            // Step 2: Get all buttons
             var buttons = screenObj.GetComponentsInChildren<MenuButton>(true);
+            Plugin.Log.LogInfo($"Found {buttons.Length} buttons in cloned screen");
 
-            bool foundKeybindsButton = false;
-            bool foundBackButton = false;
+            MenuButton keybindsButton = null;
 
             foreach (var button in buttons)
             {
+                // Skip the back button - just reconfigure it
                 if (button == _modMenuScreen.backButton)
                 {
-                    // This is the back button - configure it
                     button.OnSubmitPressed = new UnityEvent();
                     button.OnSubmitPressed.AddListener(OnBackButtonPressed);
-                    foundBackButton = true;
+                    Plugin.Log.LogInfo("Configured back button");
                     continue;
                 }
 
-                if (!foundKeybindsButton)
+                // Use first non-back button as Keybinds, disable all others
+                if (keybindsButton == null)
                 {
-                    // Repurpose first non-back button as Keybinds
+                    keybindsButton = button;
                     DisableLocalization(button.gameObject);
                     SetButtonTextDirect(button.gameObject, "Keybinds");
                     button.OnSubmitPressed = new UnityEvent();
                     button.OnSubmitPressed.AddListener(OnKeybindsButtonPressed);
-                    foundKeybindsButton = true;
+                    Plugin.Log.LogInfo($"Configured Keybinds button: {button.gameObject.name}");
+                }
+                else
+                {
+                    // Disable ALL other buttons completely
+                    button.gameObject.SetActive(false);
+                    Plugin.Log.LogInfo($"Disabled button: {button.gameObject.name}");
+                }
+            }
+
+            // Step 3: Hide any remaining UI elements that look like extras content
+            // Look for common extras menu elements
+            foreach (Transform child in screenObj.transform)
+            {
+                var childName = child.name.ToLower();
+
+                // Keep essential menu elements
+                if (childName.Contains("fleur") || childName.Contains("back") ||
+                    childName.Contains("title") || childName.Contains("canvas"))
+                {
                     continue;
                 }
 
-                // Hide other buttons
-                button.gameObject.SetActive(false);
+                // Check if this is a content container
+                var hasMenuButton = child.GetComponentInChildren<MenuButton>(true);
+                if (hasMenuButton != null)
+                {
+                    // Keep containers with our configured button or back button
+                    var isKeybindsContainer = keybindsButton != null &&
+                        (child == keybindsButton.transform || child.IsChildOf(keybindsButton.transform) ||
+                         keybindsButton.transform.IsChildOf(child));
+                    var isBackContainer = _modMenuScreen.backButton != null &&
+                        (child == _modMenuScreen.backButton.transform ||
+                         child.IsChildOf(_modMenuScreen.backButton.transform) ||
+                         _modMenuScreen.backButton.transform.IsChildOf(child));
+
+                    if (!isKeybindsContainer && !isBackContainer)
+                    {
+                        // Check each button in this container
+                        var childButtons = child.GetComponentsInChildren<MenuButton>(true);
+                        bool hasRelevantButton = false;
+                        foreach (var cb in childButtons)
+                        {
+                            if (cb == keybindsButton || cb == _modMenuScreen.backButton)
+                            {
+                                hasRelevantButton = true;
+                                break;
+                            }
+                        }
+                        if (!hasRelevantButton)
+                        {
+                            child.gameObject.SetActive(false);
+                            Plugin.Log.LogInfo($"Disabled container: {child.name}");
+                        }
+                    }
+                }
             }
 
-            if (!foundBackButton && _modMenuScreen.backButton != null)
+            // Step 4: If back button not found in modMenuScreen.backButton, configure it manually
+            if (_modMenuScreen.backButton == null)
             {
-                _modMenuScreen.backButton.OnSubmitPressed = new UnityEvent();
-                _modMenuScreen.backButton.OnSubmitPressed.AddListener(OnBackButtonPressed);
+                // Try to find a button that looks like back button
+                foreach (var button in buttons)
+                {
+                    var btnName = button.gameObject.name.ToLower();
+                    if (btnName.Contains("back"))
+                    {
+                        button.OnSubmitPressed = new UnityEvent();
+                        button.OnSubmitPressed.AddListener(OnBackButtonPressed);
+                        Plugin.Log.LogInfo("Configured back button (found by name)");
+                        break;
+                    }
+                }
             }
         }
 
