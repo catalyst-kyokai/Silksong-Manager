@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Newtonsoft.Json;
 using BepInEx;
+using GlobalEnums;
 
 namespace SilksongManager.SaveState
 {
@@ -126,13 +127,32 @@ namespace SilksongManager.SaveState
                 // 1. Restore PlayerData
                 JsonConvert.PopulateObject(state.PlayerDataJson, Plugin.PD);
 
-                // 2. Refresh UI to reflect new stats
-                // Plugin.UI.RefreshAll(); 
-
                 // 3. Restore Hero State
                 var hero = Plugin.Hero;
+                var heroType = hero.GetType();
+                var bindingFlags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public;
 
-                // Teleport
+                // Force Reset State
+                hero.StopAnimationControl();
+
+                // Invoke private ResetMotion
+                var resetMotion = heroType.GetMethod("ResetMotion", bindingFlags);
+                if (resetMotion != null)
+                {
+                    // Check parameters count to handle potential overloads
+                    if (resetMotion.GetParameters().Length == 0)
+                        resetMotion.Invoke(hero, null);
+                    else
+                        resetMotion.Invoke(hero, new object[] { false });
+                }
+
+                hero.ResetLook();
+
+                // Invoke private ResetInput
+                var resetInput = heroType.GetMethod("ResetInput", bindingFlags);
+                resetInput?.Invoke(hero, null);
+
+                // Physics & Position
                 hero.transform.position = state.Position;
                 hero.GetComponent<Rigidbody2D>().linearVelocity = state.Velocity;
 
@@ -142,12 +162,29 @@ namespace SilksongManager.SaveState
                 else
                     hero.FaceLeft();
 
-                // Reset some hero logic components
-                hero.StopAnimationControl();
+                // Gravity & Collisions
                 hero.AffectedByGravity(true);
+                hero.GetComponent<HeroBox>().HeroBoxNormal();
+                hero.GetComponent<MeshRenderer>().enabled = true;
 
-                // Flash effect to indicate load
-                // (Optional)
+                // Animation Force
+                // Invoke private SetState
+                var setState = heroType.GetMethod("SetState", bindingFlags);
+                if (setState != null)
+                    setState.Invoke(hero, new object[] { GlobalEnums.ActorStates.grounded });
+
+                hero.StartAnimationControl();
+
+                HeroAnimationController anim = hero.GetComponent<HeroAnimationController>();
+                anim.PlayClip("Idle");
+
+                // If in air, verify falling state
+                if (!hero.cState.onGround)
+                {
+                    if (setState != null)
+                        setState.Invoke(hero, new object[] { GlobalEnums.ActorStates.airborne });
+                    anim.PlayClip("Fall");
+                }
 
                 Plugin.Log.LogInfo("State applied successfully!");
             }
@@ -161,17 +198,25 @@ namespace SilksongManager.SaveState
         {
             if (_pendingLoadState != null && scene.name == _pendingLoadState.SceneName)
             {
-                // Wait one frame to let things settle? 
-                // Using Coroutine in Plugin would be safer, but let's try direct call or use Plugin.Instance to start coroutine
-                Plugin.Instance.StartCoroutine(ApplyStateAfterFrame(_pendingLoadState));
+                Plugin.Instance.StartCoroutine(ApplyStateAfterSceneLoad(_pendingLoadState));
                 _pendingLoadState = null;
             }
         }
 
-        private static System.Collections.IEnumerator ApplyStateAfterFrame(SaveStateData state)
+        private static System.Collections.IEnumerator ApplyStateAfterSceneLoad(SaveStateData state)
         {
-            yield return new WaitForEndOfFrame(); // Wait for Start() of other objects
+            // Wait for Hero to be instantiated and moved to gate
+            yield return new WaitForSeconds(0.1f);
+
+            // Wait until HeroController is accepting input or ready
+            // A hard delay is often safer for mods than checking fragile flags
+            yield return new WaitForSeconds(0.2f);
+
             ApplyStateImmediate(state);
+
+            // Double tap position after physics settles
+            yield return new WaitForFixedUpdate();
+            Plugin.Hero.transform.position = state.Position;
         }
 
         private static void SaveStatesToDisk()
