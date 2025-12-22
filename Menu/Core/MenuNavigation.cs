@@ -8,13 +8,14 @@ namespace SilksongManager.Menu.Core
 {
     /// <summary>
     /// Stack-based navigation system for custom menu screens.
-    /// Provides proper back-button support and screen history.
+    /// Properly handles main menu (CanvasGroup) vs other menus (MenuScreen).
     /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class MenuNavigation
     {
         private static readonly Stack<CustomMenuScreen> _history = new Stack<CustomMenuScreen>();
-        private static (MainMenuState State, MenuScreen Screen)? _baseMenuState;
+        private static MainMenuState _baseMenuState;
+        private static bool _wasOnMainMenu = false;
         private static bool _isTransitioning = false;
 
         /// <summary>
@@ -37,10 +38,10 @@ namespace SilksongManager.Menu.Core
             var ui = UIManager.instance;
             if (ui == null) return;
 
-            // If first custom screen, save current game menu state
+            // If first custom screen, capture where we came from
             if (_history.Count == 0)
             {
-                CaptureBaseMenuState();
+                CaptureBaseMenuState(ui);
             }
 
             // Check if already showing this screen
@@ -64,6 +65,11 @@ namespace SilksongManager.Menu.Core
                 {
                     previousScreen.InvokeOnHide(NavigationType.Forwards);
                     yield return ui.StartCoroutine(ui.HideMenu(previousScreen.MenuScreen));
+                }
+                else if (_wasOnMainMenu)
+                {
+                    // Hide main menu (CanvasGroup)
+                    yield return ui.StartCoroutine(HideMainMenu(ui));
                 }
                 else
                 {
@@ -125,12 +131,12 @@ namespace SilksongManager.Menu.Core
                     prevScreen.InvokeOnShow(NavigationType.Backwards);
                     yield return ui.StartCoroutine(ui.ShowMenu(prevScreen.MenuScreen));
                 }
-                else if (_baseMenuState.HasValue)
+                else if (_wasOnMainMenu)
                 {
-                    var (state, screen) = _baseMenuState.Value;
-                    _baseMenuState = null;
-                    yield return ui.StartCoroutine(ui.ShowMenu(screen));
-                    ui.menuState = state;
+                    // Restore main menu (CanvasGroup)
+                    yield return ui.StartCoroutine(ShowMainMenu(ui));
+                    ui.menuState = _baseMenuState;
+                    _wasOnMainMenu = false;
                 }
                 else
                 {
@@ -182,43 +188,76 @@ namespace SilksongManager.Menu.Core
             }
 
             _history.Clear();
-            _baseMenuState = null;
+            _wasOnMainMenu = false;
             _isTransitioning = false;
         }
 
-        private static void CaptureBaseMenuState()
+        private static void CaptureBaseMenuState(UIManager ui)
         {
-            var ui = UIManager.instance;
-            if (ui == null) return;
+            _baseMenuState = ui.menuState;
 
-            var state = ui.menuState;
-            var screen = GetActiveMenuScreen(ui);
-
-            if (screen != null)
+            // Check if we're on main menu (CanvasGroup)
+            if (ui.mainMenuScreen != null && ui.mainMenuScreen.gameObject.activeInHierarchy)
             {
-                _baseMenuState = (state, screen);
+                _wasOnMainMenu = true;
+                Plugin.Log.LogInfo("MenuNavigation: Captured main menu state");
+            }
+            else
+            {
+                _wasOnMainMenu = false;
             }
         }
 
-        private static MenuScreen GetActiveMenuScreen(UIManager ui)
+        /// <summary>
+        /// Hide main menu (CanvasGroup) with fade.
+        /// </summary>
+        private static IEnumerator HideMainMenu(UIManager ui)
         {
-            // Note: mainMenuScreen is CanvasGroup, not MenuScreen
-            // So we can only reliably fall back to optionsMenuScreen
-            try
+            var mainMenu = ui.mainMenuScreen;
+            if (mainMenu == null) yield break;
+
+            mainMenu.interactable = false;
+
+            // Fade out
+            float duration = 0.2f;
+            float timer = 0f;
+            float startAlpha = mainMenu.alpha;
+
+            while (timer < duration)
             {
-                if (ui.optionsMenuScreen != null && ui.optionsMenuScreen.gameObject.activeInHierarchy)
-                    return ui.optionsMenuScreen;
-
-                // Try reflection to get active screen if method exists
-                var method = typeof(UIManager).GetMethod("GetActiveMenuScreen");
-                if (method != null)
-                {
-                    return method.Invoke(ui, null) as MenuScreen;
-                }
+                timer += Time.unscaledDeltaTime;
+                mainMenu.alpha = Mathf.Lerp(startAlpha, 0f, timer / duration);
+                yield return null;
             }
-            catch { }
 
-            return ui.optionsMenuScreen; // Fallback
+            mainMenu.alpha = 0f;
+            mainMenu.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Show main menu (CanvasGroup) with fade.
+        /// </summary>
+        private static IEnumerator ShowMainMenu(UIManager ui)
+        {
+            var mainMenu = ui.mainMenuScreen;
+            if (mainMenu == null) yield break;
+
+            mainMenu.gameObject.SetActive(true);
+            mainMenu.alpha = 0f;
+
+            // Fade in
+            float duration = 0.2f;
+            float timer = 0f;
+
+            while (timer < duration)
+            {
+                timer += Time.unscaledDeltaTime;
+                mainMenu.alpha = Mathf.Lerp(0f, 1f, timer / duration);
+                yield return null;
+            }
+
+            mainMenu.alpha = 1f;
+            mainMenu.interactable = true;
         }
     }
 
@@ -231,3 +270,4 @@ namespace SilksongManager.Menu.Core
         Backwards
     }
 }
+
