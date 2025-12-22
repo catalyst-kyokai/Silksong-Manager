@@ -14,12 +14,31 @@ namespace SilksongManager
         /// </summary>
         public ConfigFile ConfigFile => _config;
 
-        // General Settings
-        public bool EnableHotkeys { get; private set; }
-        public bool ShowDebugInfo { get; private set; }
-        public bool EnableLogging { get; private set; }
+        // Config entries with backing
+        private ConfigEntry<bool> _enableHotkeys;
+        private ConfigEntry<bool> _showDebugInfo;
+        private ConfigEntry<bool> _enableLogging;
 
-        // Debug Menu Settings
+        // General Settings - now with public setters
+        public bool EnableHotkeys
+        {
+            get => _enableHotkeys?.Value ?? true;
+            set { if (_enableHotkeys != null) _enableHotkeys.Value = value; }
+        }
+
+        public bool ShowDebugInfo
+        {
+            get => _showDebugInfo?.Value ?? false;
+            set { if (_showDebugInfo != null) _showDebugInfo.Value = value; }
+        }
+
+        public bool EnableLogging
+        {
+            get => _enableLogging?.Value ?? true;
+            set { if (_enableLogging != null) _enableLogging.Value = value; }
+        }
+
+        // Debug Menu Settings (read-only)
         public float MenuWidth { get; private set; }
         public float MenuHeight { get; private set; }
         public int FontSize { get; private set; }
@@ -33,26 +52,26 @@ namespace SilksongManager
         private void LoadConfig()
         {
             // General Settings
-            EnableHotkeys = _config.Bind(
+            _enableHotkeys = _config.Bind(
                 "General",
                 "EnableHotkeys",
                 true,
                 "Enable keyboard hotkeys for quick actions"
-            ).Value;
+            );
 
-            ShowDebugInfo = _config.Bind(
+            _showDebugInfo = _config.Bind(
                 "General",
                 "ShowDebugInfo",
                 false,
                 "Show debug information on screen"
-            ).Value;
+            );
 
-            EnableLogging = _config.Bind(
+            _enableLogging = _config.Bind(
                 "General",
                 "EnableLogging",
                 true,
                 "Enable logging to BepInEx console"
-            ).Value;
+            );
 
             // Debug Menu Settings
             MenuWidth = _config.Bind(
@@ -78,3 +97,4 @@ namespace SilksongManager
         }
     }
 }
+

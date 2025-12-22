@@ -714,54 +714,95 @@ namespace SilksongManager.Menu
                 Plugin.Log.LogInfo($"Configured back button at bottom of screen");
             }
 
-            // STEP 5: Create Keybinds button by cloning back button
+            // STEP 5: Create menu buttons by cloning back button
             if (_modMenuScreen.backButton != null)
             {
-                var keybindsButtonObj = Object.Instantiate(_modMenuScreen.backButton.gameObject, screenObj.transform);
-                keybindsButtonObj.name = "KeybindsButton";
+                // Create Keybinds button
+                var keybindsButtonObj = CreateMenuButton(screenObj, "KeybindsButton", "Keybinds", 60, OnKeybindsButtonPressed);
 
-                // Position above the back button
-                var rect = keybindsButtonObj.GetComponent<RectTransform>();
-                if (rect != null)
+                // Create Settings button  
+                var settingsButtonObj = CreateMenuButton(screenObj, "SettingsButton", "Settings", 0, OnSettingsButtonPressed);
+
+                // Create About button
+                var aboutButtonObj = CreateMenuButton(screenObj, "AboutButton", "About", -60, OnAboutButtonPressed);
+
+                // Get MenuButton components
+                var keybindsButton = keybindsButtonObj?.GetComponent<MenuButton>();
+                var settingsButton = settingsButtonObj?.GetComponent<MenuButton>();
+                var aboutButton = aboutButtonObj?.GetComponent<MenuButton>();
+                var backButton = _modMenuScreen.backButton;
+
+                // Setup navigation: Keybinds -> Settings -> About -> Back (loop)
+                if (keybindsButton != null && settingsButton != null && aboutButton != null && backButton != null)
                 {
-                    rect.anchorMin = new Vector2(0.5f, 0.5f);
-                    rect.anchorMax = new Vector2(0.5f, 0.5f);
-                    rect.pivot = new Vector2(0.5f, 0.5f);
-                    rect.anchoredPosition = new Vector2(0, 0); // Center of screen
-                }
+                    SetupButtonNavigation(keybindsButton, null, settingsButton);
+                    SetupButtonNavigation(settingsButton, keybindsButton, aboutButton);
+                    SetupButtonNavigation(aboutButton, settingsButton, backButton);
 
-                var keybindsButton = keybindsButtonObj.GetComponent<MenuButton>();
-                if (keybindsButton != null)
-                {
-                    keybindsButton.OnSubmitPressed = new UnityEvent();
-                    keybindsButton.OnSubmitPressed.AddListener(OnKeybindsButtonPressed);
+                    var backNav = backButton.navigation;
+                    backNav.mode = Navigation.Mode.Explicit;
+                    backNav.selectOnUp = aboutButton;
+                    backNav.selectOnDown = keybindsButton;
+                    backButton.navigation = backNav;
 
-                    // Set text
-                    DestroyLocalization(keybindsButtonObj);
-                    SetButtonTextDirect(keybindsButtonObj, "Keybinds");
-
-                    // Setup navigation
+                    // Keybinds loops to back when going up
                     var keybindsNav = keybindsButton.navigation;
-                    keybindsNav.mode = Navigation.Mode.Explicit;
-                    keybindsNav.selectOnDown = _modMenuScreen.backButton;
+                    keybindsNav.selectOnUp = backButton;
                     keybindsButton.navigation = keybindsNav;
 
-                    var backNav = _modMenuScreen.backButton.navigation;
-                    backNav.selectOnUp = keybindsButton;
-                    _modMenuScreen.backButton.navigation = backNav;
-
-                    // Set as default highlight
+                    // Set first button as default highlight
                     _modMenuScreen.defaultHighlight = keybindsButton;
 
-                    Plugin.Log.LogInfo("Created Keybinds button at center");
+                    Plugin.Log.LogInfo("Created 3 menu buttons with navigation");
                 }
             }
             else
             {
-                Plugin.Log.LogWarning("Back button not found, cannot create Keybinds button!");
+                Plugin.Log.LogWarning("Back button not found, cannot create menu buttons!");
             }
 
             Plugin.Log.LogInfo("Menu screen content modification complete!");
+        }
+
+        private static GameObject CreateMenuButton(GameObject parent, string name, string text, float yOffset, UnityAction onClick)
+        {
+            if (_modMenuScreen?.backButton == null) return null;
+
+            var buttonObj = Object.Instantiate(_modMenuScreen.backButton.gameObject, parent.transform);
+            buttonObj.name = name;
+
+            var rect = buttonObj.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.anchorMin = new Vector2(0.5f, 0.5f);
+                rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = new Vector2(0, yOffset);
+            }
+
+            var menuButton = buttonObj.GetComponent<MenuButton>();
+            if (menuButton != null)
+            {
+                menuButton.OnSubmitPressed = new UnityEvent();
+                menuButton.OnSubmitPressed.AddListener(onClick);
+
+                DestroyLocalization(buttonObj);
+                SetButtonTextDirect(buttonObj, text);
+            }
+
+            Plugin.Log.LogInfo($"Created button '{text}' at Y={yOffset}");
+            return buttonObj;
+        }
+
+        private static void SetupButtonNavigation(MenuButton button, MenuButton up, MenuButton down)
+        {
+            if (button == null) return;
+
+            var nav = button.navigation;
+            nav.mode = Navigation.Mode.Explicit;
+            nav.selectOnUp = up;
+            nav.selectOnDown = down;
+            button.navigation = nav;
         }
 
         private static void DestroyLocalization(GameObject obj)
@@ -888,5 +929,135 @@ namespace SilksongManager.Menu
 
             ih?.StartUIInput();
         }
+
+        #region Settings Screen
+
+        private static void OnSettingsButtonPressed()
+        {
+            Plugin.Log.LogInfo("Settings button pressed!");
+            var ui = UIManager.instance;
+            if (ui != null)
+            {
+                ui.StartCoroutine(GoToSettingsScreen(ui));
+            }
+        }
+
+        private static IEnumerator GoToSettingsScreen(UIManager ui)
+        {
+            var ih = GameManager.instance?.inputHandler;
+            ih?.StopUIInput();
+
+            if (_menuController != null)
+            {
+                _menuController.SetActive(false);
+            }
+
+            var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
+            yield return ui.StartCoroutine(FadeOutCanvasGroup(modCg, ui));
+
+            ModSettingsScreen.Initialize();
+            yield return ui.StartCoroutine(ModSettingsScreen.Show(ui));
+
+            ih?.StartUIInput();
+        }
+
+        public static void ReturnFromSettingsScreen()
+        {
+            var ui = UIManager.instance;
+            if (ui != null)
+            {
+                ui.StartCoroutine(ReturnFromSettingsScreenCoroutine(ui));
+            }
+        }
+
+        private static IEnumerator ReturnFromSettingsScreenCoroutine(UIManager ui)
+        {
+            var ih = GameManager.instance?.inputHandler;
+            ih?.StopUIInput();
+
+            yield return ui.StartCoroutine(ModSettingsScreen.Hide(ui));
+
+            var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
+            yield return ui.StartCoroutine(FadeInCanvasGroup(modCg, ui));
+
+            if (_menuController != null)
+            {
+                _menuController.SetActive(true);
+            }
+
+            if (_modMenuScreen?.defaultHighlight != null)
+            {
+                UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(_modMenuScreen.defaultHighlight.gameObject);
+            }
+
+            ih?.StartUIInput();
+        }
+
+        #endregion
+
+        #region About Screen
+
+        private static void OnAboutButtonPressed()
+        {
+            Plugin.Log.LogInfo("About button pressed!");
+            var ui = UIManager.instance;
+            if (ui != null)
+            {
+                ui.StartCoroutine(GoToAboutScreen(ui));
+            }
+        }
+
+        private static IEnumerator GoToAboutScreen(UIManager ui)
+        {
+            var ih = GameManager.instance?.inputHandler;
+            ih?.StopUIInput();
+
+            if (_menuController != null)
+            {
+                _menuController.SetActive(false);
+            }
+
+            var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
+            yield return ui.StartCoroutine(FadeOutCanvasGroup(modCg, ui));
+
+            ModAboutScreen.Initialize();
+            yield return ui.StartCoroutine(ModAboutScreen.Show(ui));
+
+            ih?.StartUIInput();
+        }
+
+        public static void ReturnFromAboutScreen()
+        {
+            var ui = UIManager.instance;
+            if (ui != null)
+            {
+                ui.StartCoroutine(ReturnFromAboutScreenCoroutine(ui));
+            }
+        }
+
+        private static IEnumerator ReturnFromAboutScreenCoroutine(UIManager ui)
+        {
+            var ih = GameManager.instance?.inputHandler;
+            ih?.StopUIInput();
+
+            yield return ui.StartCoroutine(ModAboutScreen.Hide(ui));
+
+            var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
+            yield return ui.StartCoroutine(FadeInCanvasGroup(modCg, ui));
+
+            if (_menuController != null)
+            {
+                _menuController.SetActive(true);
+            }
+
+            if (_modMenuScreen?.defaultHighlight != null)
+            {
+                UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(_modMenuScreen.defaultHighlight.gameObject);
+            }
+
+            ih?.StartUIInput();
+        }
+
+        #endregion
     }
 }

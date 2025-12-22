@@ -75,9 +75,6 @@ namespace SilksongManager
             // Apply Harmony patches for custom damage
             Patches.DamagePatches.Apply();
 
-            // Apply Harmony patches for menu system
-            Menu.Core.UIManagerPatches.Apply();
-
             // Initialize debug menu
             _debugMenu = gameObject.AddComponent<DebugMenu.DebugMenuController>();
 
