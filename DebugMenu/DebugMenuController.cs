@@ -61,9 +61,35 @@ namespace SilksongManager.DebugMenu
             // This overrides the game's InputHandler which hides cursor during gameplay
             if (_isVisible)
             {
-                Cursor.visible = true;
-                Cursor.lockState = CursorLockMode.None;
+                ForceCursorVisible();
             }
+        }
+
+        /// <summary>
+        /// Force the cursor to be visible, overriding game systems.
+        /// </summary>
+        private void ForceCursorVisible()
+        {
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+
+            // Also try to tell InputHandler that we want cursor visible
+            // This helps with the game's internal state
+            try
+            {
+                var ih = GameManager.instance?.inputHandler;
+                if (ih != null)
+                {
+                    // Force the internal state - invoke cursor visibility change event
+                    // This makes the game's UI input module work properly
+                    var uiManager = UIManager.instance;
+                    if (uiManager != null && uiManager.inputModule != null)
+                    {
+                        uiManager.inputModule.allowMouseInput = true;
+                    }
+                }
+            }
+            catch { }
         }
 
         private void OnGUI()

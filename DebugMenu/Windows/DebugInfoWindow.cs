@@ -5,6 +5,7 @@ namespace SilksongManager.DebugMenu.Windows
 {
     /// <summary>
     /// Debug information window showing FPS, game stats, player info.
+    /// Optimized with caching to prevent FPS drops.
     /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public class DebugInfoWindow : BaseWindow
@@ -25,11 +26,20 @@ namespace SilksongManager.DebugMenu.Windows
         private int _frameCount = 0;
         private float _frameTimeSum = 0f;
 
+        // Cached values (updated once per second to avoid FPS drops)
+        private const float CACHE_REFRESH_INTERVAL = 1f;
+        private float _cacheTimer = 0f;
+
+        private int _cachedEnemyCount = 0;
+        private float _cachedMemory = 0f;
+        private Rigidbody2D _cachedRigidbody = null;
+        private bool _rigidbodyCached = false;
+
         public override void Update()
         {
             base.Update();
 
-            // FPS calculation
+            // FPS calculation (lightweight, ok every frame)
             _deltaTime += (Time.unscaledDeltaTime - _deltaTime) * 0.1f;
 
             _fpsUpdateTimer += Time.unscaledDeltaTime;
@@ -39,15 +49,14 @@ namespace SilksongManager.DebugMenu.Windows
                 _fpsUpdateTimer = 0f;
             }
 
-            // Frame time tracking
-            float frameTime = Time.unscaledDeltaTime * 1000f; // ms
+            // Frame time tracking (lightweight)
+            float frameTime = Time.unscaledDeltaTime * 1000f;
             _minFrameTime = Mathf.Min(_minFrameTime, frameTime);
             _maxFrameTime = Mathf.Max(_maxFrameTime, frameTime);
             _frameTimeSum += frameTime;
             _frameCount++;
             _avgFrameTime = _frameTimeSum / _frameCount;
 
-            // Reset stats periodically
             if (_frameCount > 300)
             {
                 _minFrameTime = frameTime;
@@ -55,26 +64,41 @@ namespace SilksongManager.DebugMenu.Windows
                 _frameTimeSum = frameTime;
                 _frameCount = 1;
             }
+
+            // Update expensive cached values periodically
+            _cacheTimer += Time.unscaledDeltaTime;
+            if (_cacheTimer >= CACHE_REFRESH_INTERVAL)
+            {
+                RefreshCachedValues();
+                _cacheTimer = 0f;
+            }
+        }
+
+        private void RefreshCachedValues()
+        {
+            // These are expensive operations - only do once per second
+            _cachedEnemyCount = Enemies.EnemyActions.GetEnemyCount();
+            _cachedMemory = System.GC.GetTotalMemory(false) / (1024f * 1024f);
+
+            // Cache rigidbody reference
+            if (!_rigidbodyCached || _cachedRigidbody == null)
+            {
+                var hero = Plugin.Hero;
+                if (hero != null)
+                {
+                    _cachedRigidbody = hero.GetComponent<Rigidbody2D>();
+                    _rigidbodyCached = true;
+                }
+            }
         }
 
         protected override void DrawContent()
         {
-            // Performance section
             DrawPerformanceSection();
-
-            // Game State section
             DrawGameStateSection();
-
-            // Player section
             DrawPlayerSection();
-
-            // Position section
             DrawPositionSection();
-
-            // Scene section
             DrawSceneSection();
-
-            // Input section
             DrawInputSection();
         }
 
@@ -82,7 +106,6 @@ namespace SilksongManager.DebugMenu.Windows
         {
             DebugMenuStyles.DrawSectionHeader("PERFORMANCE");
 
-            // FPS with color coding
             Color fpsColor = _fps >= 60 ? DebugMenuStyles.StatusOn :
                              _fps >= 30 ? DebugMenuStyles.StatusWarning :
                              DebugMenuStyles.StatusOff;
@@ -97,10 +120,7 @@ namespace SilksongManager.DebugMenu.Windows
 
             GUILayout.Label($"Frame Time: {_deltaTime * 1000f:F2} ms", DebugMenuStyles.Label);
             GUILayout.Label($"Min/Avg/Max: {_minFrameTime:F1}/{_avgFrameTime:F1}/{_maxFrameTime:F1} ms", DebugMenuStyles.Label);
-
-            // Memory (approximate)
-            float memoryMB = System.GC.GetTotalMemory(false) / (1024f * 1024f);
-            GUILayout.Label($"Memory (GC): {memoryMB:F1} MB", DebugMenuStyles.Label);
+            GUILayout.Label($"Memory (GC): {_cachedMemory:F1} MB", DebugMenuStyles.Label);
         }
 
         private void DrawGameStateSection()
@@ -110,16 +130,11 @@ namespace SilksongManager.DebugMenu.Windows
             var gm = Plugin.GM;
 
             GUILayout.Label($"Game Speed: {Time.timeScale:F2}x", DebugMenuStyles.Label);
-            GUILayout.Label($"Time: {Time.time:F1}s (unscaled: {Time.unscaledTime:F1}s)", DebugMenuStyles.Label);
+            GUILayout.Label($"Time: {Time.time:F1}s", DebugMenuStyles.Label);
 
             if (gm != null)
             {
                 GUILayout.Label($"Scene: {gm.sceneName}", DebugMenuStyles.Label);
-                GUILayout.Label($"Paused: {(Time.timeScale < 0.01f ? "Yes" : "No")}", DebugMenuStyles.Label);
-            }
-            else
-            {
-                GUILayout.Label("GameManager: N/A", DebugMenuStyles.Label);
             }
         }
 
@@ -136,22 +151,15 @@ namespace SilksongManager.DebugMenu.Windows
                 return;
             }
 
-            // Health & Silk
             GUILayout.Label($"Health: {pd.health}/{pd.maxHealth}", DebugMenuStyles.Label);
             GUILayout.Label($"Silk: {pd.silk}/{pd.silkMax}", DebugMenuStyles.Label);
             GUILayout.Label($"Geo: {pd.geo}", DebugMenuStyles.Label);
-
-            // States
-            GUILayout.Space(4);
             GUILayout.Label($"Invincible: {(pd.isInvincible ? "ON" : "OFF")}", DebugMenuStyles.Label);
             GUILayout.Label($"Noclip: {(Player.PlayerActions.IsNoclipEnabled ? "ON" : "OFF")}", DebugMenuStyles.Label);
 
-            // Hero states
             if (hero.cState != null)
             {
                 GUILayout.Label($"Grounded: {(hero.cState.onGround ? "Yes" : "No")}", DebugMenuStyles.Label);
-                GUILayout.Label($"Dashing: {(hero.cState.dashing ? "Yes" : "No")}", DebugMenuStyles.Label);
-                GUILayout.Label($"Attacking: {(hero.cState.attacking ? "Yes" : "No")}", DebugMenuStyles.Label);
             }
         }
 
@@ -167,16 +175,12 @@ namespace SilksongManager.DebugMenu.Windows
             }
 
             var pos = hero.transform.position;
-            GUILayout.Label($"X: {pos.x:F3}", DebugMenuStyles.Label);
-            GUILayout.Label($"Y: {pos.y:F3}", DebugMenuStyles.Label);
-            GUILayout.Label($"Z: {pos.z:F3}", DebugMenuStyles.Label);
+            GUILayout.Label($"X: {pos.x:F2}  Y: {pos.y:F2}", DebugMenuStyles.Label);
 
-            // Velocity
-            var rb = hero.GetComponent<Rigidbody2D>();
-            if (rb != null)
+            // Use cached rigidbody
+            if (_cachedRigidbody != null)
             {
-                var vel = rb.linearVelocity;
-                GUILayout.Label($"Velocity: ({vel.x:F1}, {vel.y:F1})", DebugMenuStyles.Label);
+                var vel = _cachedRigidbody.linearVelocity;
                 GUILayout.Label($"Speed: {vel.magnitude:F1}", DebugMenuStyles.Label);
             }
         }
@@ -187,12 +191,7 @@ namespace SilksongManager.DebugMenu.Windows
 
             var scene = SceneManager.GetActiveScene();
             GUILayout.Label($"Name: {scene.name}", DebugMenuStyles.Label);
-            GUILayout.Label($"Build Index: {scene.buildIndex}", DebugMenuStyles.Label);
-            GUILayout.Label($"Objects: {scene.rootCount} root", DebugMenuStyles.Label);
-
-            // Enemy count
-            int enemyCount = Enemies.EnemyActions.GetEnemyCount();
-            GUILayout.Label($"Enemies: {enemyCount}", DebugMenuStyles.Label);
+            GUILayout.Label($"Enemies: {_cachedEnemyCount}", DebugMenuStyles.Label);
         }
 
         private void DrawInputSection()
@@ -201,17 +200,7 @@ namespace SilksongManager.DebugMenu.Windows
 
             var mousePos = Input.mousePosition;
             GUILayout.Label($"Mouse: ({mousePos.x:F0}, {mousePos.y:F0})", DebugMenuStyles.Label);
-
-            // Current pressed keys
-            string keys = "";
-            if (Input.GetKey(KeyCode.W)) keys += "W ";
-            if (Input.GetKey(KeyCode.A)) keys += "A ";
-            if (Input.GetKey(KeyCode.S)) keys += "S ";
-            if (Input.GetKey(KeyCode.D)) keys += "D ";
-            if (Input.GetKey(KeyCode.Space)) keys += "Space ";
-            if (Input.GetKey(KeyCode.LeftShift)) keys += "Shift ";
-
-            GUILayout.Label($"Keys: {(string.IsNullOrEmpty(keys) ? "None" : keys)}", DebugMenuStyles.Label);
         }
     }
 }
+
