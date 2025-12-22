@@ -188,9 +188,21 @@ namespace SilksongManager.DebugMenu
                 Time.timeScale = 0f;
             }
 
-            // Show all windows that were visible before (they load their state on construct)
-            // Main window always shows
-            _mainWindow?.Show();
+            // Restore all windows to their saved visibility states
+            foreach (var window in _windows)
+            {
+                // Main window always shows, others restore their saved state
+                if (window == _mainWindow)
+                {
+                    window.IsVisible = true;
+                }
+                else
+                {
+                    // Load saved visibility from config
+                    var state = DebugMenuConfig.GetWindowState(window.WindowId);
+                    window.IsVisible = state.IsVisible;
+                }
+            }
 
             Plugin.Log.LogInfo("Debug menu opened");
         }
@@ -204,7 +216,7 @@ namespace SilksongManager.DebugMenu
 
             _isVisible = false;
 
-            // Save all window states before hiding
+            // Save all window states BEFORE hiding (to preserve current visibility)
             foreach (var window in _windows)
             {
                 window.SaveState();
@@ -214,16 +226,16 @@ namespace SilksongManager.DebugMenu
             Cursor.visible = _previousCursorVisible;
             Cursor.lockState = _previousCursorLockState;
 
-            // Restore time scale if we paused
-            if (DebugMenuConfig.PauseGameOnMenu)
+            // Always restore time scale if we paused it
+            if (DebugMenuConfig.PauseGameOnMenu && Time.timeScale == 0f)
             {
-                Time.timeScale = _previousTimeScale;
+                Time.timeScale = _previousTimeScale > 0f ? _previousTimeScale : 1f;
             }
 
-            // Hide all windows
+            // Hide all windows WITHOUT saving (already saved above)
             foreach (var window in _windows)
             {
-                window.Hide();
+                window.IsVisible = false;  // Just set visibility, don't call Hide() which saves
             }
 
             Plugin.Log.LogInfo("Debug menu closed");
