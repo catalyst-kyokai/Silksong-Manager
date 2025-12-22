@@ -133,28 +133,23 @@ namespace SilksongManager.Player
 
         private static void ProcessInfiniteJumps(HeroController hero)
         {
-            if (_doubleJumpedField == null) return;
-
-            try
+            // Make game think player is always on ground = infinite regular jumps
+            // This is the most reliable method as it allows standard jump behavior
+            if (!hero.cState.jumping && !hero.cState.doubleJumping)
             {
-                bool doubleJumped = (bool)_doubleJumpedField.GetValue(hero);
-
-                // Reset doubleJumped when:
-                // 1. Player lands on ground
-                // 2. Player is no longer in doubleJumping animation state
-                // 3. After a small delay from the actual double jump
-                if (doubleJumped)
-                {
-                    // Reset when on ground or when not actively in double jump animation
-                    if (hero.cState.onGround || !hero.cState.doubleJumping)
-                    {
-                        _doubleJumpedField.SetValue(hero, false);
-                    }
-                }
+                // Only set onGround when not actively in a jump animation
+                // This allows the jump to initiate properly
+                hero.cState.onGround = true;
             }
-            catch (Exception e)
+
+            // Also reset doubleJumped flag for extra jumps
+            if (_doubleJumpedField != null)
             {
-                Plugin.Log.LogWarning($"ProcessInfiniteJumps error: {e.Message}");
+                try
+                {
+                    _doubleJumpedField.SetValue(hero, false);
+                }
+                catch { }
             }
         }
 
