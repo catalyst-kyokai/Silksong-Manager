@@ -41,6 +41,7 @@ namespace SilksongManager.DebugMenu
             _windows.Add(new ItemsWindow());
             _windows.Add(new KeybindsWindow());
             _windows.Add(new SettingsWindow());
+            _windows.Add(new DebugInfoWindow());
 
             Plugin.Log.LogInfo("DebugMenuController initialized with " + _windows.Count + " windows");
         }
@@ -51,6 +52,17 @@ namespace SilksongManager.DebugMenu
             foreach (var window in _windows)
             {
                 window.Update();
+            }
+        }
+
+        private void LateUpdate()
+        {
+            // Force cursor visibility every frame while menu is open
+            // This overrides the game's InputHandler which hides cursor during gameplay
+            if (_isVisible)
+            {
+                Cursor.visible = true;
+                Cursor.lockState = CursorLockMode.None;
             }
         }
 
