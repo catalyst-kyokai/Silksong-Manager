@@ -263,8 +263,8 @@ namespace SilksongManager.Menu.Keybinds
             contentObj.transform.SetParent(parent, false);
 
             var contentRect = contentObj.AddComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0.1f, 0.20f); // Higher bottom to make room for Reset button
-            contentRect.anchorMax = new Vector2(0.9f, 0.80f); // Lower top for Title
+            contentRect.anchorMin = new Vector2(0.05f, 0.20f); // Shifted left (was 0.1)
+            contentRect.anchorMax = new Vector2(0.85f, 0.80f); // Shifted left (was 0.9)
 
             contentRect.offsetMin = Vector2.zero;
             contentRect.offsetMax = Vector2.zero;
