@@ -208,6 +208,15 @@ namespace SilksongManager.SaveState
                 hero.transitionState = HeroTransitionState.WAITING_TO_TRANSITION;
                 hero.cState.transitioning = false;
 
+                // Invoke FinishedEnteringScene to clean up all flags
+                // private void FinishedEnteringScene(bool setHazardMarker = true, bool preventRunBob = false)
+                var finishedEntering = heroType.GetMethod("FinishedEnteringScene", bindingFlags);
+                if (finishedEntering != null)
+                {
+                    Plugin.Log.LogInfo("Invoking FinishedEnteringScene...");
+                    finishedEntering.Invoke(hero, new object[] { true, false });
+                }
+
                 Plugin.Log.LogInfo("State applied successfully!");
             }
             catch (Exception e)
