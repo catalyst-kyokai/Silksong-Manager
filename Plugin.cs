@@ -78,6 +78,9 @@ namespace SilksongManager
             // Initialize debug menu
             _debugMenu = gameObject.AddComponent<DebugMenu.DebugMenuController>();
 
+            // Initialize hitbox system
+            Hitbox.HitboxManager.Initialize(gameObject);
+
             // Subscribe to scene loading events
             SceneManager.sceneLoaded += OnSceneLoaded;
 
@@ -207,6 +210,12 @@ namespace SilksongManager
             if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ResetGameSpeed))
             {
                 World.WorldActions.SetGameSpeed(1f);
+            }
+
+            // Toggle Hitboxes
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ToggleHitboxes))
+            {
+                Hitbox.HitboxManager.ToggleHitboxes();
             }
         }
 

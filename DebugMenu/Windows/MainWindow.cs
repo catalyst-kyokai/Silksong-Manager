@@ -160,6 +160,11 @@ namespace SilksongManager.DebugMenu.Windows
                 _controller.ToggleWindow<CombatWindow>();
             }
 
+            if (GUILayout.Button("Hitboxes", DebugMenuStyles.Button))
+            {
+                _controller.ToggleWindow<HitboxWindow>();
+            }
+
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
         }

@@ -26,7 +26,8 @@ namespace SilksongManager.Menu.Keybinds
         HealToFull,
         IncreaseGameSpeed,
         DecreaseGameSpeed,
-        ResetGameSpeed
+        ResetGameSpeed,
+        ToggleHitboxes
     }
 
     /// <summary>
@@ -58,7 +59,8 @@ namespace SilksongManager.Menu.Keybinds
             { ModAction.HealToFull, KeyCode.None },
             { ModAction.IncreaseGameSpeed, KeyCode.Equals },
             { ModAction.DecreaseGameSpeed, KeyCode.Minus },
-            { ModAction.ResetGameSpeed, KeyCode.Alpha0 }
+            { ModAction.ResetGameSpeed, KeyCode.Alpha0 },
+            { ModAction.ToggleHitboxes, KeyCode.F4 }
         };
 
         /// <summary>
@@ -82,7 +84,8 @@ namespace SilksongManager.Menu.Keybinds
             { ModAction.HealToFull, "Heal to Full" },
             { ModAction.IncreaseGameSpeed, "Speed Up" },
             { ModAction.DecreaseGameSpeed, "Speed Down" },
-            { ModAction.ResetGameSpeed, "Reset Speed" }
+            { ModAction.ResetGameSpeed, "Reset Speed" },
+            { ModAction.ToggleHitboxes, "Show Hitboxes" }
         };
 
         /// <summary>

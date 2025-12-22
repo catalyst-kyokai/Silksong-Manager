@@ -54,6 +54,7 @@ namespace SilksongManager.DebugMenu
             _windows.Add(new SettingsWindow());
             _windows.Add(new DebugInfoWindow());
             _windows.Add(new CombatWindow());
+            _windows.Add(new HitboxWindow());
 
             Plugin.Log.LogInfo("DebugMenuController initialized with " + _windows.Count + " windows");
         }
