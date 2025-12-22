@@ -76,6 +76,7 @@ namespace SilksongManager.DebugMenu
         private static GUIStyle _labelStyle;
         private static GUIStyle _labelBoldStyle;
         private static GUIStyle _labelCenteredStyle;
+        private static GUIStyle _labelSmallStyle;
         private static GUIStyle _buttonStyle;
         private static GUIStyle _buttonSmallStyle;
         private static GUIStyle _toggleStyle;
@@ -141,6 +142,11 @@ namespace SilksongManager.DebugMenu
             _labelCenteredStyle = new GUIStyle(_labelStyle)
             {
                 alignment = TextAnchor.MiddleCenter
+            };
+
+            _labelSmallStyle = new GUIStyle(_labelStyle)
+            {
+                fontSize = 11
             };
 
             // Button style
@@ -239,6 +245,7 @@ namespace SilksongManager.DebugMenu
         public static GUIStyle Window => _windowStyle;
         public static GUIStyle Header => _headerStyle;
         public static GUIStyle Label => _labelStyle;
+        public static GUIStyle LabelSmall => _labelSmallStyle;
         public static GUIStyle LabelBold => _labelBoldStyle;
         public static GUIStyle LabelCentered => _labelCenteredStyle;
         public static GUIStyle Button => _buttonStyle;

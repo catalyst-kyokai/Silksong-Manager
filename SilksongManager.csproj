@@ -73,6 +73,10 @@
       <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     
     <!-- Game Assembly -->
     <Reference Include="Assembly-CSharp">

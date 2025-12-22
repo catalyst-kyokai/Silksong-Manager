@@ -165,6 +165,11 @@ namespace SilksongManager.DebugMenu.Windows
                 _controller.ToggleWindow<HitboxWindow>();
             }
 
+            if (GUILayout.Button("Save States", DebugMenuStyles.Button))
+            {
+                _controller.ToggleWindow<SaveStateWindow>();
+            }
+
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
         }

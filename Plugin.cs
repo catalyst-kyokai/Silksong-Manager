@@ -18,6 +18,11 @@ namespace SilksongManager
         public static ManualLogSource Log { get; private set; }
 
         /// <summary>
+        /// Singleton instance.
+        /// </summary>
+        public static Plugin Instance { get; private set; }
+
+        /// <summary>
         /// Configuration instance.
         /// </summary>
         public static PluginConfig ModConfig { get; private set; }
@@ -59,6 +64,7 @@ namespace SilksongManager
 
         private void Awake()
         {
+            Instance = this;
             Log = Logger;
             Log.LogInfo($"Silksong Manager v{PluginInfo.VERSION} loading...");
 
@@ -80,6 +86,9 @@ namespace SilksongManager
 
             // Initialize hitbox system
             Hitbox.HitboxManager.Initialize(gameObject);
+
+            // Initialize save state manager
+            SaveState.SaveStateManager.Initialize();
 
             // Subscribe to scene loading events
             SceneManager.sceneLoaded += OnSceneLoaded;
