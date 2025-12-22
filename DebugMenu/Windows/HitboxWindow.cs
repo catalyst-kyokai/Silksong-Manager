@@ -5,7 +5,7 @@ namespace SilksongManager.DebugMenu.Windows
 {
     public class HitboxWindow : BaseWindow
     {
-        public override int WindowId => 10008;
+        public override int WindowId => 10010;
         public override string Title => "Hitbox Visualizer";
         protected override Vector2 DefaultSize => new Vector2(300, 480);
 

@@ -132,9 +132,6 @@ namespace SilksongManager.DebugMenu.Windows
                 _controller.ToggleWindow<KeybindsWindow>();
             }
 
-            GUILayout.EndVertical();
-            GUILayout.BeginVertical();
-
             if (GUILayout.Button("World", DebugMenuStyles.Button))
             {
                 _controller.ToggleWindow<WorldWindow>();
@@ -144,6 +141,9 @@ namespace SilksongManager.DebugMenu.Windows
             {
                 _controller.ToggleWindow<ItemsWindow>();
             }
+
+            GUILayout.EndVertical();
+            GUILayout.BeginVertical();
 
             if (GUILayout.Button("Settings", DebugMenuStyles.Button))
             {
