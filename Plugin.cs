@@ -1,6 +1,7 @@
 using BepInEx;
 using BepInEx.Logging;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace SilksongManager
 {
@@ -46,6 +47,11 @@ namespace SilksongManager
         /// </summary>
         private DebugMenu.DebugMenuController _debugMenu;
 
+        /// <summary>
+        /// Track if we already initialized menu hook
+        /// </summary>
+        private bool _menuHookInitialized = false;
+
         private void Awake()
         {
             Log = Logger;
@@ -56,6 +62,9 @@ namespace SilksongManager
 
             // Initialize debug menu
             _debugMenu = gameObject.AddComponent<DebugMenu.DebugMenuController>();
+
+            // Subscribe to scene loading events
+            SceneManager.sceneLoaded += OnSceneLoaded;
 
             Log.LogInfo("Silksong Manager initialized successfully!");
         }
@@ -125,9 +134,44 @@ namespace SilksongManager
             }
         }
 
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            Log.LogInfo($"Scene loaded: {scene.name}");
+
+            // Check if this is the menu scene
+            if (GM != null && GM.IsMenuScene())
+            {
+                // Delay initialization to let UI elements load
+                StartCoroutine(InitializeMenuHookDelayed());
+            }
+            else
+            {
+                // Reset menu hook when leaving menu scene
+                _menuHookInitialized = false;
+                Menu.MainMenuHook.Reset();
+            }
+        }
+
+        private System.Collections.IEnumerator InitializeMenuHookDelayed()
+        {
+            // Wait a frame for UI to be ready
+            yield return null;
+            yield return null;
+
+            if (!_menuHookInitialized)
+            {
+                Menu.MainMenuHook.Initialize();
+                _menuHookInitialized = true;
+            }
+        }
+
         private void OnDestroy()
         {
+            // Unsubscribe from events
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+
             Log.LogInfo("Silksong Manager unloaded.");
         }
     }
 }
+
