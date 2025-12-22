@@ -72,6 +72,9 @@ namespace SilksongManager
             Player.CheatSystem.Initialize(Config);
             Damage.DamageSystem.Initialize(Config);
 
+            // Apply Harmony patches for custom damage
+            Patches.DamagePatches.Apply();
+
             // Initialize debug menu
             _debugMenu = gameObject.AddComponent<DebugMenu.DebugMenuController>();
 
