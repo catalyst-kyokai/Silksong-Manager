@@ -63,10 +63,10 @@ namespace SilksongManager.SaveState
                 state.PlayerDataJson = JsonConvert.SerializeObject(Plugin.PD);
 
                 // Capture SceneData (persistent world flags)
-                // We use JsonUtility as SceneData is a ScriptableObject often
+                // We use JsonConvert as SceneData has [JsonObject(MemberSerialization.Fields)]
                 if (SceneData.instance != null)
                 {
-                    state.SceneDataJson = UnityEngine.JsonUtility.ToJson(SceneData.instance);
+                    state.SceneDataJson = JsonConvert.SerializeObject(SceneData.instance);
                 }
 
                 // Capture Hero State
@@ -132,7 +132,7 @@ namespace SilksongManager.SaveState
             }
             if (SceneData.instance != null && !string.IsNullOrEmpty(state.SceneDataJson))
             {
-                UnityEngine.JsonUtility.FromJsonOverwrite(state.SceneDataJson, SceneData.instance);
+                JsonConvert.PopulateObject(state.SceneDataJson, SceneData.instance);
             }
 
             // Reset transitions
