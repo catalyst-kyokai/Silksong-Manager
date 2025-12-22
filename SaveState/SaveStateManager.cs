@@ -266,7 +266,12 @@ namespace SilksongManager.SaveState
                 else hero.FaceLeft();
 
                 // Explicitly invoke FinishedEnteringScene to clear flags
-                hero.FinishedEnteringScene(true, false);
+                // Use Reflection as it is private in some versions
+                var method = typeof(HeroController).GetMethod("FinishedEnteringScene", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                if (method != null)
+                {
+                    method.Invoke(hero, new object[] { true, false });
+                }
                 hero.GetComponent<MeshRenderer>().enabled = true;
 
                 // Animation Force
