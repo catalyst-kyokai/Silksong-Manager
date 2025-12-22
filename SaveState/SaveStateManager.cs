@@ -56,6 +56,7 @@ namespace SilksongManager.SaveState
                 state.Position = hero.transform.position;
                 state.Velocity = hero.GetComponent<Rigidbody2D>().linearVelocity;
                 state.FacingRight = hero.cState.facingRight;
+                state.IsGrounded = hero.cState.onGround;
 
                 // Redundant info for UI
                 state.Health = Plugin.PD.health;
@@ -168,19 +169,22 @@ namespace SilksongManager.SaveState
                 hero.GetComponent<MeshRenderer>().enabled = true;
 
                 // Animation Force
-                // Invoke private SetState
                 var setState = heroType.GetMethod("SetState", bindingFlags);
-                if (setState != null)
-                    setState.Invoke(hero, new object[] { GlobalEnums.ActorStates.grounded });
 
                 hero.StartAnimationControl();
 
                 HeroAnimationController anim = hero.GetComponent<HeroAnimationController>();
-                anim.PlayClip("Idle");
 
-                // If in air, verify falling state
-                if (!hero.cState.onGround)
+                if (state.IsGrounded)
                 {
+                    hero.cState.onGround = true;
+                    if (setState != null)
+                        setState.Invoke(hero, new object[] { GlobalEnums.ActorStates.grounded });
+                    anim.PlayClip("Idle");
+                }
+                else
+                {
+                    hero.cState.onGround = false;
                     if (setState != null)
                         setState.Invoke(hero, new object[] { GlobalEnums.ActorStates.airborne });
                     anim.PlayClip("Fall");
