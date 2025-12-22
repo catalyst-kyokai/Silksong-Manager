@@ -596,33 +596,14 @@ namespace SilksongManager.Menu.Keybinds
 
         private static void HideMainMenuElements(UIManager ui)
         {
-            // Hide main menu options
-            var mainMenuOptions = Object.FindAnyObjectByType<MainMenuOptions>();
-            if (mainMenuOptions != null)
-            {
-                mainMenuOptions.gameObject.SetActive(false);
-            }
-
-            // Hide any visible menu screens
-            if (ui.mainMenuScreen != null)
-            {
-                var mainCg = ui.mainMenuScreen.GetComponent<CanvasGroup>();
-                if (mainCg != null)
-                {
-                    mainCg.alpha = 0f;
-                    mainCg.interactable = false;
-                }
-            }
+            // Use same logic as GoToModMenu in MainMenuHook
+            MainMenuHook.HideMainMenu(ui);
         }
 
         private static void ShowMainMenuElements(UIManager ui)
         {
-            // Show main menu options
-            var mainMenuOptions = Object.FindAnyObjectByType<MainMenuOptions>();
-            if (mainMenuOptions != null)
-            {
-                mainMenuOptions.gameObject.SetActive(true);
-            }
+            // Use same logic as ReturnToMainMenu in MainMenuHook
+            MainMenuHook.ShowMainMenu(ui);
         }
 
         public static IEnumerator Hide(UIManager ui)

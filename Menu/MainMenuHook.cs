@@ -339,6 +339,50 @@ namespace SilksongManager.Menu
 
         public static bool IsInModMenu => _isInModMenu;
 
+        /// <summary>
+        /// Hide main menu elements (for use by sub-screens like Keybinds).
+        /// </summary>
+        public static void HideMainMenu(UIManager ui)
+        {
+            ui.StartCoroutine(FadeOutSprite(ui.gameTitle));
+
+            // Fade out subtitle
+            try
+            {
+                var subtitleFSM = ui.GetType().GetField("subtitleFSM")?.GetValue(ui);
+                if (subtitleFSM != null)
+                {
+                    var sendEventMethod = subtitleFSM.GetType().GetMethod("SendEvent", new[] { typeof(string) });
+                    sendEventMethod?.Invoke(subtitleFSM, new object[] { "FADE OUT" });
+                }
+            }
+            catch { }
+
+            ui.StartCoroutine(FadeOutCanvasGroup(ui.mainMenuScreen, ui));
+        }
+
+        /// <summary>
+        /// Show main menu elements (for use by sub-screens returning).
+        /// </summary>
+        public static void ShowMainMenu(UIManager ui)
+        {
+            ui.StartCoroutine(FadeInSprite(ui.gameTitle));
+
+            // Fade in subtitle
+            try
+            {
+                var subtitleFSM = ui.GetType().GetField("subtitleFSM")?.GetValue(ui);
+                if (subtitleFSM != null)
+                {
+                    var sendEventMethod = subtitleFSM.GetType().GetMethod("SendEvent", new[] { typeof(string) });
+                    sendEventMethod?.Invoke(subtitleFSM, new object[] { "FADE IN" });
+                }
+            }
+            catch { }
+
+            ui.StartCoroutine(FadeInCanvasGroup(ui.mainMenuScreen, ui));
+        }
+
         #region UI Transition Helpers (mimicking UIManager methods)
 
         private static IEnumerator FadeOutSprite(SpriteRenderer sprite)
