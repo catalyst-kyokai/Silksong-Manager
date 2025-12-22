@@ -138,11 +138,11 @@ namespace SilksongManager
         {
             Log.LogInfo($"Scene loaded: {scene.name}");
 
-            // Check if this is the menu scene
-            if (GM != null && GM.IsMenuScene())
+            // Check if this is the menu scene by name
+            if (scene.name == "Menu_Title")
             {
-                // Delay initialization to let UI elements load
-                StartCoroutine(InitializeMenuHookDelayed());
+                // Start waiting for MainMenuOptions to appear
+                StartCoroutine(WaitForMainMenuAndInitialize());
             }
             else
             {
@@ -152,17 +152,34 @@ namespace SilksongManager
             }
         }
 
-        private System.Collections.IEnumerator InitializeMenuHookDelayed()
+        private System.Collections.IEnumerator WaitForMainMenuAndInitialize()
         {
-            // Wait a frame for UI to be ready
-            yield return null;
-            yield return null;
+            float timeout = 10f;
+            float elapsed = 0f;
 
-            if (!_menuHookInitialized)
+            Log.LogInfo("Waiting for MainMenuOptions to appear...");
+
+            // Wait until MainMenuOptions is found or timeout
+            while (elapsed < timeout)
             {
-                Menu.MainMenuHook.Initialize();
-                _menuHookInitialized = true;
+                var mainMenuOptions = Object.FindObjectOfType<MainMenuOptions>();
+                if (mainMenuOptions != null)
+                {
+                    Log.LogInfo($"MainMenuOptions found after {elapsed:F2}s");
+
+                    if (!_menuHookInitialized)
+                    {
+                        Menu.MainMenuHook.Initialize();
+                        _menuHookInitialized = true;
+                    }
+                    yield break;
+                }
+
+                yield return new WaitForSeconds(0.1f);
+                elapsed += 0.1f;
             }
+
+            Log.LogWarning($"MainMenuOptions not found after {timeout}s timeout!");
         }
 
         private void OnDestroy()
