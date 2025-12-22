@@ -190,7 +190,8 @@ namespace SilksongManager.SaveState
                 EntryDelay = 0f,
                 WaitForSceneTransitionCameraFade = false,
                 Visualization = GameManager.SceneLoadVisualizations.Default,
-                PreventCameraFadeOut = true,
+                WaitForSceneTransitionCameraFade = false,
+                Visualization = GameManager.SceneLoadVisualizations.Default,
                 AlwaysUnloadUnusedAssets = true
             });
 
@@ -223,32 +224,34 @@ namespace SilksongManager.SaveState
             // Apply Hero State
             ApplyStateImmediate(state);
 
-            // Handle Unpause if game was paused
-            if (GameManager.instance.isPaused)
+            // Handle Unpause / Unlock universally
+            // We force this even if not paused, to ensure state is clean
+            GameManager.instance.FadeSceneIn();
+            GameManager.instance.isPaused = false;
+            GameCameras.instance.ResumeCameraShake();
+            Plugin.Hero.UnPause();
+
+            // Reflection for MenuButtonList.ClearAllLastSelected()
+            var menuButtonListType = Assembly.GetAssembly(typeof(GameManager)).GetType("MenuButtonList");
+            if (menuButtonListType != null)
             {
-                GameManager.instance.FadeSceneIn();
-                GameManager.instance.isPaused = false;
-                GameCameras.instance.ResumeCameraShake();
-                Plugin.Hero.UnPause();
-                // Reflection for MenuButtonList.ClearAllLastSelected()
-                var menuButtonListType = Assembly.GetAssembly(typeof(GameManager)).GetType("MenuButtonList");
-                if (menuButtonListType != null)
-                {
-                    var clearMethod = menuButtonListType.GetMethod("ClearAllLastSelected", BindingFlags.Public | BindingFlags.Static);
-                    clearMethod?.Invoke(null, null);
-                }
-
-                // Reflection for TimeManager.TimeScale = 1f
-                var timeManagerType = Assembly.GetAssembly(typeof(GameManager)).GetType("TimeManager");
-                if (timeManagerType != null)
-                {
-                    var timeScaleProp = timeManagerType.GetProperty("TimeScale", BindingFlags.Public | BindingFlags.Static);
-                    timeScaleProp?.SetValue(null, 1f);
-                }
-
-                // Fallback direct Time.timeScale
-                Time.timeScale = 1f;
+                var clearMethod = menuButtonListType.GetMethod("ClearAllLastSelected", BindingFlags.Public | BindingFlags.Static);
+                clearMethod?.Invoke(null, null);
             }
+
+            // Reflection for TimeManager.TimeScale = 1f
+            var timeManagerType = Assembly.GetAssembly(typeof(GameManager)).GetType("TimeManager");
+            if (timeManagerType != null)
+            {
+                var timeScaleProp = timeManagerType.GetProperty("TimeScale", BindingFlags.Public | BindingFlags.Static);
+                timeScaleProp?.SetValue(null, 1f);
+            }
+
+            // Fallback direct Time.timeScale
+            Time.timeScale = 1f;
+
+            // Ensure Input is accepted
+            // GameManager.instance.inputHandler.StartAcceptingInput(); // If needed via Reflection
 
             // Final Physics Tap
             yield return new WaitForFixedUpdate();
