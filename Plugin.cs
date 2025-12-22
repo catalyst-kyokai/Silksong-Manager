@@ -52,6 +52,11 @@ namespace SilksongManager
         /// </summary>
         private bool _menuHookInitialized = false;
 
+        /// <summary>
+        /// Track if enemies are currently frozen for toggle
+        /// </summary>
+        private bool _enemiesFrozen = false;
+
         private void Awake()
         {
             Log = Logger;
@@ -59,6 +64,9 @@ namespace SilksongManager
 
             // Initialize configuration
             ModConfig = new PluginConfig(base.Config);
+
+            // Initialize keybind manager with config file
+            Menu.Keybinds.ModKeybindManager.Initialize(Config);
 
             // Initialize debug menu
             _debugMenu = gameObject.AddComponent<DebugMenu.DebugMenuController>();
@@ -71,8 +79,8 @@ namespace SilksongManager
 
         private void Update()
         {
-            // Toggle debug menu with F1
-            if (Input.GetKeyDown(KeyCode.F1))
+            // Toggle debug menu
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ToggleDebugMenu))
             {
                 _debugMenu?.ToggleMenu();
             }
@@ -85,52 +93,87 @@ namespace SilksongManager
         {
             if (!ModConfig.EnableHotkeys) return;
 
-            // F2 - Quick Heal
-            if (Input.GetKeyDown(KeyCode.F2))
-            {
-                Player.PlayerActions.QuickHeal();
-            }
-
-            // F3 - Refill Silk
-            if (Input.GetKeyDown(KeyCode.F3))
-            {
-                Player.PlayerActions.QuickSilk();
-            }
-
-            // F4 - Toggle Invincibility
-            if (Input.GetKeyDown(KeyCode.F4))
-            {
-                Player.PlayerActions.ToggleInvincibility();
-            }
-
-            // F5 - Add 1000 Geo
-            if (Input.GetKeyDown(KeyCode.F5))
-            {
-                Currency.CurrencyActions.AddGeo(1000);
-            }
-
-            // F6 - Toggle Infinite Jumps
-            if (Input.GetKeyDown(KeyCode.F6))
-            {
-                Player.PlayerActions.ToggleInfiniteJumps();
-            }
-
-            // F7 - Toggle Noclip
-            if (Input.GetKeyDown(KeyCode.F7))
+            // Toggle Noclip
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ToggleNoclip))
             {
                 Player.PlayerActions.ToggleNoclip();
             }
 
-            // F9 - Save Position
-            if (Input.GetKeyDown(KeyCode.F9))
+            // Toggle Invincibility
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ToggleInvincibility))
+            {
+                Player.PlayerActions.ToggleInvincibility();
+            }
+
+            // Save Position
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.SavePosition))
             {
                 World.WorldActions.SavePosition();
             }
 
-            // F10 - Load Position
-            if (Input.GetKeyDown(KeyCode.F10))
+            // Load Position
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.LoadPosition))
             {
                 World.WorldActions.LoadPosition();
+            }
+
+            // Kill All Enemies
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.KillAllEnemies))
+            {
+                Enemies.EnemyActions.KillAllEnemies();
+            }
+
+            // Freeze Enemies (toggle)
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.FreezeEnemies))
+            {
+                // Simple toggle - freeze if not frozen, unfreeze if frozen
+                _enemiesFrozen = !_enemiesFrozen;
+                if (_enemiesFrozen)
+                    Enemies.EnemyActions.FreezeAllEnemies();
+                else
+                    Enemies.EnemyActions.UnfreezeAllEnemies();
+            }
+
+            // Add Geo
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.AddGeo))
+            {
+                Currency.CurrencyActions.AddGeo(1000);
+            }
+
+            // Add Shell Shards
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.AddShellShards))
+            {
+                Currency.CurrencyActions.AddShards(5);
+            }
+
+            // Max Silk
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.MaxSilk))
+            {
+                Player.PlayerActions.QuickSilk();
+            }
+
+            // Heal to Full
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.HealToFull))
+            {
+                Player.PlayerActions.QuickHeal();
+            }
+
+            // Game Speed controls
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.IncreaseGameSpeed))
+            {
+                var current = Time.timeScale;
+                World.WorldActions.SetGameSpeed(current + 0.25f);
+            }
+
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.DecreaseGameSpeed))
+            {
+                var current = Time.timeScale;
+                World.WorldActions.SetGameSpeed(Mathf.Max(0.1f, current - 0.25f));
+            }
+
+            if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ResetGameSpeed))
+            {
+                World.WorldActions.SetGameSpeed(1f);
             }
         }
 

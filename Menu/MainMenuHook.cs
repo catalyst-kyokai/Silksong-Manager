@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
+using SilksongManager.Menu.Keybinds;
 using Object = UnityEngine.Object;
 
 namespace SilksongManager.Menu
@@ -710,7 +711,56 @@ namespace SilksongManager.Menu
 
         private static void OnKeybindsButtonPressed()
         {
-            Plugin.Log.LogInfo("Keybinds button pressed - not yet implemented.");
+            Plugin.Log.LogInfo("Keybinds button pressed!");
+
+            var ui = UIManager.instance;
+            if (ui != null)
+            {
+                ui.StartCoroutine(GoToKeybindsScreen(ui));
+            }
+        }
+
+        private static IEnumerator GoToKeybindsScreen(UIManager ui)
+        {
+            var ih = GameManager.instance?.inputHandler;
+            ih?.StopUIInput();
+
+            // Hide mod menu
+            yield return ui.StartCoroutine(HideMenu(_modMenuScreen, ui));
+
+            // Initialize keybinds screen if needed
+            ModKeybindsScreen.Initialize();
+
+            // Show keybinds screen
+            yield return ui.StartCoroutine(ModKeybindsScreen.Show(ui));
+
+            ih?.StartUIInput();
+        }
+
+        /// <summary>
+        /// Called from keybinds screen to return to SS Manager menu.
+        /// </summary>
+        public static void ReturnFromKeybindsScreen()
+        {
+            var ui = UIManager.instance;
+            if (ui != null)
+            {
+                ui.StartCoroutine(ReturnFromKeybindsScreenCoroutine(ui));
+            }
+        }
+
+        private static IEnumerator ReturnFromKeybindsScreenCoroutine(UIManager ui)
+        {
+            var ih = GameManager.instance?.inputHandler;
+            ih?.StopUIInput();
+
+            // Hide keybinds screen
+            yield return ui.StartCoroutine(ModKeybindsScreen.Hide(ui));
+
+            // Show mod menu
+            yield return ui.StartCoroutine(ShowMenu(_modMenuScreen, ui));
+
+            ih?.StartUIInput();
         }
     }
 }
