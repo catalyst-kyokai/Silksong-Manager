@@ -1,12 +1,17 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceProviders;
 using Newtonsoft.Json;
 using BepInEx;
 using GlobalEnums;
+using HarmonyLib;
 using HutongGames.PlayMaker;
 
 namespace SilksongManager.SaveState
@@ -16,6 +21,7 @@ namespace SilksongManager.SaveState
         private static List<SaveStateData> _saveStates = new List<SaveStateData>();
         private static string _saveFilePath;
         private static SaveStateData _pendingLoadState;
+        private static Harmony _harmony;
 
         // Events
         public static event Action OnStatesChanged;
@@ -25,8 +31,12 @@ namespace SilksongManager.SaveState
             _saveFilePath = Path.Combine(Paths.ConfigPath, "SilksongManager_SaveStates.json");
             LoadStatesFromDisk();
 
-            // Hook into scene load for cross-scene state loading
-            SceneManager.sceneLoaded += OnSceneLoaded;
+            // Initialize Harmony for FindEntryPoint patch
+            _harmony = new Harmony("com.silksongmanager.savestate");
+            _harmony.Patch(
+                original: AccessTools.Method(typeof(GameManager), "FindEntryPoint"),
+                prefix: new HarmonyMethod(typeof(SaveStateManager), nameof(FindEntryPointPatch))
+            );
         }
 
         public static List<SaveStateData> GetStates()
@@ -49,9 +59,15 @@ namespace SilksongManager.SaveState
                 state.Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 state.SceneName = SceneManager.GetActiveScene().name;
 
-                // Capture PlayerData using Newtonsoft.Json
-                // We utilize the fact that PlayerData fields are public/serializable
+                // Capture PlayerData
                 state.PlayerDataJson = JsonConvert.SerializeObject(Plugin.PD);
+
+                // Capture SceneData (persistent world flags)
+                // We use JsonUtility as SceneData is a ScriptableObject often
+                if (SceneData.instance != null)
+                {
+                    state.SceneDataJson = JsonUtility.ToJson(SceneData.instance);
+                }
 
                 // Capture Hero State
                 var hero = Plugin.Hero;
@@ -82,30 +98,78 @@ namespace SilksongManager.SaveState
         public static void LoadState(SaveStateData state)
         {
             if (state == null) return;
+            if (Plugin.Hero == null) return;
 
-            // 1. Restore PlayerData IMMEDIATELY
-            // This is critical so that when the scene reloads, the world gen (enemies, bosses, walls)
-            // sees the correct flags (e.g., boss dead = false).
+            // Start the loading coroutine
+            Plugin.Instance.StartCoroutine(LoadStateCoro(state));
+        }
+
+        private static IEnumerator LoadStateCoro(SaveStateData state)
+        {
+            Plugin.Log.LogInfo($"Starting robust load for state: {state.SceneName}");
+            _pendingLoadState = state;
+
+            // 1. Force state cleanup
+            Time.timeScale = 0f;
+
+            // Clean up existing coroutines if any
+            Plugin.Hero.StopAllCoroutines();
+
+            // 2. Load Dummy Scene ("Demo Start") to clear memory/state
+            string dummySceneName = "Demo Start";
+            // Check if we are already in dummy scene? Unlikely, but safe to reload
+
+            // Use Addressables for async loading if possible, or fallback to SceneManager
+            // Silksong uses Addressables for scenes usually
+            yield return Addressables.LoadSceneAsync("Scenes/" + dummySceneName, LoadSceneMode.Single).Task.AsIEnumerator();
+
+            // Wait for dummy scene
+            yield return new WaitUntil(() => SceneManager.GetActiveScene().name == dummySceneName);
+
+            // 3. Restore Data while in dummy scene
             if (Plugin.PD != null && !string.IsNullOrEmpty(state.PlayerDataJson))
             {
                 JsonConvert.PopulateObject(state.PlayerDataJson, Plugin.PD);
             }
+            if (SceneData.instance != null && !string.IsNullOrEmpty(state.SceneDataJson))
+            {
+                JsonUtility.FromJsonOverwrite(state.SceneDataJson, SceneData.instance);
+            }
 
-            // 2. Force Scene Reload
-            // We always trigger a transition, even if in the same scene, to reset the world state.
-            _pendingLoadState = state;
-            Plugin.Log.LogInfo($"Loading state (forcing reload): {state.SceneName}");
+            // Reset transitions
+            StaticVariableList.ClearSceneTransitions();
 
+            // 4. Load Destination Scene
+            // Use GameManager transition to handle all the setup
             Plugin.GM.BeginSceneTransition(new GameManager.SceneLoadInfo
             {
                 SceneName = state.SceneName,
-                EntryGateName = "door1", // Dummy gate, we will teleport anyway
-                HeroLeaveDirection = GlobalEnums.GatePosition.unknown,
+                EntryGateName = "dreamGate", // Hijacked by our patch
+                HeroLeaveDirection = GatePosition.unknown,
                 EntryDelay = 0f,
                 WaitForSceneTransitionCameraFade = false,
                 Visualization = GameManager.SceneLoadVisualizations.Default,
                 PreventCameraFadeOut = true
             });
+
+            // Wait until destination scene is active
+            yield return new WaitUntil(() => SceneManager.GetActiveScene().name == state.SceneName);
+
+            // 5. Post-Load Fixes
+            yield return new WaitForSeconds(0.1f); // Brief wait for objects to init
+
+            // Apply Hero State
+            ApplyStateImmediate(state);
+
+            // Time Scale back
+            Time.timeScale = 1f;
+            _pendingLoadState = null;
+
+            // Reset HUD and other systems
+            PlayMakerFSM.BroadcastEvent("CHARM INDICATOR CHECK");
+            PlayMakerFSM.BroadcastEvent("UPDATE NAIL DAMAGE");
+
+            Plugin.Log.LogInfo("Load complete!");
         }
 
         public static void DeleteState(SaveStateData state)
@@ -121,129 +185,52 @@ namespace SilksongManager.SaveState
         {
             try
             {
-                if (Plugin.PD == null || Plugin.Hero == null) return;
-
-                // 1. Restore PlayerData
-                JsonConvert.PopulateObject(state.PlayerDataJson, Plugin.PD);
-
-                // 3. Restore Hero State
+                if (Plugin.Hero == null) return;
                 var hero = Plugin.Hero;
-                var heroType = hero.GetType();
-                var bindingFlags = BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public;
 
-                // Force Reset State
-                hero.StopAnimationControl();
+                // Position logic is handled largely by FindEntryPoint patch + GM spawn,
+                // but we double tap it here just in case
+                hero.transform.position = state.Position;
+                hero.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero; // Stop physics
+                hero.GetComponent<Rigidbody2D>().isKinematic = false;
 
-                // Invoke private ResetMotion
-                var resetMotion = heroType.GetMethod("ResetMotion", bindingFlags);
-                if (resetMotion != null)
+                // Face direction
+                if (state.FacingRight) hero.FaceRight();
+                else hero.FaceLeft();
+
+                // Explicitly invoke FinishedEnteringScene to clear flags
+                var method = typeof(HeroController).GetMethod("FinishedEnteringScene", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                if (method != null)
                 {
-                    // Check parameters count to handle potential overloads
-                    if (resetMotion.GetParameters().Length == 0)
-                        resetMotion.Invoke(hero, null);
-                    else
-                        resetMotion.Invoke(hero, new object[] { false });
+                    method.Invoke(hero, new object[] { true, false });
                 }
 
-                hero.ResetLook();
-
-                // Invoke private ResetInput
-                var resetInput = heroType.GetMethod("ResetInput", bindingFlags);
-                resetInput?.Invoke(hero, null);
-
-                // Physics & Position
-                hero.transform.position = state.Position;
-                hero.GetComponent<Rigidbody2D>().linearVelocity = state.Velocity;
-
-                // Facing
-                if (state.FacingRight)
-                    hero.FaceRight();
-                else
-                    hero.FaceLeft();
-
-                // Gravity & Collisions
-                hero.AffectedByGravity(true);
-                hero.GetComponent<HeroBox>().HeroBoxNormal();
-                hero.GetComponent<MeshRenderer>().enabled = true;
-
                 // Animation Force
-                var setState = heroType.GetMethod("SetState", bindingFlags);
-
                 hero.StartAnimationControl();
-
-                HeroAnimationController anim = hero.GetComponent<HeroAnimationController>();
-
+                var anim = hero.GetComponent<HeroAnimationController>();
+                // Force Idle if grounded
                 if (state.IsGrounded)
                 {
                     hero.cState.onGround = true;
-                    // Force Zero Velocity to prevent popping/sliding
-                    hero.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
-
-                    if (setState != null)
-                        setState.Invoke(hero, new object[] { GlobalEnums.ActorStates.grounded });
                     anim.PlayClip("Idle");
 
                     // Force ProxyFSM to Idle
-                    var proxyFSMField = heroType.GetField("proxyFSM", bindingFlags);
-                    if (proxyFSMField != null)
-                    {
-                        var proxyFSM = proxyFSMField.GetValue(hero) as PlayMakerFSM;
-                        if (proxyFSM != null)
-                            proxyFSM.SendEvent("HeroCtrl-Idle");
-                    }
+                    var proxyFSMField = typeof(HeroController).GetField("proxyFSM", BindingFlags.Instance | BindingFlags.NonPublic);
+                    var proxyFSM = proxyFSMField?.GetValue(hero) as PlayMakerFSM;
+                    proxyFSM?.SendEvent("HeroCtrl-Idle");
                 }
                 else
                 {
                     hero.cState.onGround = false;
-                    if (setState != null)
-                        setState.Invoke(hero, new object[] { GlobalEnums.ActorStates.airborne });
                     anim.PlayClip("Fall");
                 }
 
-                // Reset Transition State explicitly
                 hero.transitionState = HeroTransitionState.WAITING_TO_TRANSITION;
-                hero.cState.transitioning = false;
-
-                // Invoke FinishedEnteringScene to clean up all flags
-                // private void FinishedEnteringScene(bool setHazardMarker = true, bool preventRunBob = false)
-                var finishedEntering = heroType.GetMethod("FinishedEnteringScene", bindingFlags);
-                if (finishedEntering != null)
-                {
-                    Plugin.Log.LogInfo("Invoking FinishedEnteringScene...");
-                    finishedEntering.Invoke(hero, new object[] { true, false });
-                }
-
-                Plugin.Log.LogInfo("State applied successfully!");
             }
             catch (Exception e)
             {
                 Plugin.Log.LogError($"Failed to apply state: {e.Message}");
             }
-        }
-
-        private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-        {
-            if (_pendingLoadState != null && scene.name == _pendingLoadState.SceneName)
-            {
-                Plugin.Instance.StartCoroutine(ApplyStateAfterSceneLoad(_pendingLoadState));
-                _pendingLoadState = null;
-            }
-        }
-
-        private static System.Collections.IEnumerator ApplyStateAfterSceneLoad(SaveStateData state)
-        {
-            // Wait for Hero to be instantiated and moved to gate
-            yield return new WaitForSeconds(0.1f);
-
-            // Wait until HeroController is accepting input or ready
-            // A hard delay is often safer for mods than checking fragile flags
-            yield return new WaitForSeconds(0.2f);
-
-            ApplyStateImmediate(state);
-
-            // Double tap position after physics settles
-            yield return new WaitForFixedUpdate();
-            Plugin.Hero.transform.position = state.Position;
         }
 
         private static void SaveStatesToDisk()
@@ -275,6 +262,37 @@ namespace SilksongManager.SaveState
             catch (Exception e)
             {
                 Plugin.Log.LogError($"Failed to load states from disk: {e.Message}");
+            }
+        }
+
+        // --- Harmony Patch to Hijack Spawn Point ---
+
+        // [HarmonyPatch(typeof(GameManager), "FindEntryPoint")]
+        public static bool FindEntryPointPatch(GameManager __instance, ref Vector2? __result, string entryPointName)
+        {
+            // If we are loading a specific state via our system
+            if (_pendingLoadState != null && entryPointName == "dreamGate")
+            {
+                // Hijack the "dreamGate" entry point to return our saved position
+                __result = _pendingLoadState.Position;
+                return false; // Skip original method
+            }
+            return true; // Run original method
+        }
+    }
+
+    // Helper to run Task as IEnumerator
+    public static class TaskExtensions
+    {
+        public static IEnumerator AsIEnumerator(this System.Threading.Tasks.Task task)
+        {
+            while (!task.IsCompleted)
+            {
+                yield return null;
+            }
+            if (task.IsFaulted)
+            {
+                throw task.Exception ?? new Exception("Task failed");
             }
         }
     }

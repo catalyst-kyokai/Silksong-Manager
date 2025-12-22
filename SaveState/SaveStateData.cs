@@ -12,6 +12,8 @@ namespace SilksongManager.SaveState
 
         // Serialized PlayerData (contains inventory, story progress, etc.)
         public string PlayerDataJson;
+        // Serialized SceneData (contains semi-persistent world flags)
+        public string SceneDataJson;
 
         // Hero State
         public Vector3 Position;
