@@ -559,10 +559,18 @@ namespace SilksongManager.Menu.Keybinds
             RefreshAllDisplays();
 
             // NOTE: We transition from SS Manager, not main menu
-            // So we don't need to hide main menu here (it's already hidden)
+            // SS Manager is hidden, main menu was already hidden when entering SS Manager
 
             var cg = _keybindsMenuScreen.GetComponent<CanvasGroup>();
             _keybindsMenuScreen.gameObject.SetActive(true);
+
+            // Add/enable input controller for Escape handling
+            var inputController = _keybindsMenuScreen.gameObject.GetComponent<KeybindsInputController>();
+            if (inputController == null)
+            {
+                inputController = _keybindsMenuScreen.gameObject.AddComponent<KeybindsInputController>();
+            }
+            inputController.enabled = true;
 
             if (cg != null)
             {
@@ -584,18 +592,8 @@ namespace SilksongManager.Menu.Keybinds
             {
                 EventSystem.current?.SetSelectedGameObject(_mappableEntries[0].button.gameObject);
             }
-        }
 
-        private static void HideMainMenuElements(UIManager ui)
-        {
-            // Use same logic as GoToModMenu in MainMenuHook
-            MainMenuHook.HideMainMenu(ui);
-        }
-
-        private static void ShowMainMenuElements(UIManager ui)
-        {
-            // Use same logic as ReturnToMainMenu in MainMenuHook
-            MainMenuHook.ShowMainMenu(ui);
+            Plugin.Log.LogInfo("Keybinds screen shown");
         }
 
         public static IEnumerator Hide(UIManager ui)
@@ -636,5 +634,23 @@ namespace SilksongManager.Menu.Keybinds
         public Text keyText;
         public Image keyBg;
         public bool isListening;
+    }
+
+    /// <summary>
+    /// Controller attached to keybinds screen to handle Escape key.
+    /// </summary>
+    public class KeybindsInputController : MonoBehaviour
+    {
+        void Update()
+        {
+            if (!ModKeybindsScreen.IsActive) return;
+
+            // Check for Escape key
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                Plugin.Log.LogInfo("Escape pressed in keybinds menu, returning to SS Manager");
+                MainMenuHook.ReturnFromKeybindsScreen();
+            }
+        }
     }
 }
