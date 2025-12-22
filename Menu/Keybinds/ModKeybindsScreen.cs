@@ -62,33 +62,16 @@ namespace SilksongManager.Menu.Keybinds
                 return;
             }
 
-            // Find the keyboard menu container via UIButtonSkins
-            var uibs = ui.uiButtonSkins;
-            if (uibs == null || uibs.mappableKeyboardButtons == null)
+            // Use ExtrasMenuScreen as template - same as SS Manager does
+            // This avoids pulling in optionsMenuScreen logic
+            var templateScreen = ui.extrasMenuScreen;
+            if (templateScreen == null)
             {
-                Plugin.Log.LogError("UIButtonSkins or mappableKeyboardButtons not found!");
+                Plugin.Log.LogError("ExtrasMenuScreen not found!");
                 return;
             }
 
-            // The keyboard menu should be a parent of mappableKeyboardButtons
-            // Find the MenuScreen in the hierarchy
-            var keyboardPanel = uibs.mappableKeyboardButtons;
-            MenuScreen templateScreen = null;
-            Transform current = keyboardPanel;
-
-            while (current != null && templateScreen == null)
-            {
-                templateScreen = current.GetComponent<MenuScreen>();
-                if (templateScreen == null)
-                    current = current.parent;
-            }
-
-            if (templateScreen == null)
-            {
-                // Fallback: use options menu as template
-                templateScreen = ui.optionsMenuScreen;
-                Plugin.Log.LogWarning("Could not find keyboard MenuScreen, using options menu as fallback");
-            }
+            Plugin.Log.LogInfo($"Creating ModKeybindsScreen from {templateScreen.name}");
 
             // Clone the screen
             var screenObj = Object.Instantiate(templateScreen.gameObject, templateScreen.transform.parent);
@@ -102,6 +85,14 @@ namespace SilksongManager.Menu.Keybinds
                 return;
             }
 
+            // Remove MenuButtonList which may have original navigation logic
+            var menuButtonList = screenObj.GetComponent<MenuButtonList>();
+            if (menuButtonList != null)
+            {
+                Object.DestroyImmediate(menuButtonList);
+                Plugin.Log.LogInfo("Removed MenuButtonList from cloned screen");
+            }
+
             // Hide initially
             screenObj.SetActive(false);
             var cg = screenObj.GetComponent<CanvasGroup>();
@@ -109,6 +100,7 @@ namespace SilksongManager.Menu.Keybinds
             {
                 cg.alpha = 0f;
                 cg.interactable = false;
+                cg.blocksRaycasts = false;
             }
 
             // Modify content
