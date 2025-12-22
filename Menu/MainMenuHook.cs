@@ -769,6 +769,12 @@ namespace SilksongManager.Menu
             var ih = GameManager.instance?.inputHandler;
             ih?.StopUIInput();
 
+            // Deactivate ModMenuController so Escape doesn't trigger HandleBackPressed
+            if (_menuController != null)
+            {
+                _menuController.SetActive(false);
+            }
+
             // Hide mod menu
             var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
             yield return ui.StartCoroutine(FadeOutCanvasGroup(modCg, ui));
@@ -805,6 +811,12 @@ namespace SilksongManager.Menu
             // Show mod menu
             var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
             yield return ui.StartCoroutine(FadeInCanvasGroup(modCg, ui));
+
+            // Reactivate ModMenuController for SS Manager
+            if (_menuController != null)
+            {
+                _menuController.SetActive(true);
+            }
 
             // Focus Keybinds button
             if (_modMenuScreen?.defaultHighlight != null)

@@ -566,8 +566,8 @@ namespace SilksongManager.Menu.Keybinds
             _isActive = true;
             RefreshAllDisplays();
 
-            // HIDE main menu elements
-            HideMainMenuElements(ui);
+            // NOTE: We transition from SS Manager, not main menu
+            // So we don't need to hide main menu here (it's already hidden)
 
             var cg = _keybindsMenuScreen.GetComponent<CanvasGroup>();
             _keybindsMenuScreen.gameObject.SetActive(true);
@@ -612,8 +612,8 @@ namespace SilksongManager.Menu.Keybinds
 
             _isActive = false;
 
-            // Restore main menu elements
-            ShowMainMenuElements(ui);
+            // NOTE: We return to SS Manager, not main menu
+            // So we don't show main menu here (will be handled by MainMenuHook)
 
             var cg = _keybindsMenuScreen.GetComponent<CanvasGroup>();
             if (cg != null)
