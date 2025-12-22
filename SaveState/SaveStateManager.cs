@@ -132,7 +132,16 @@ namespace SilksongManager.SaveState
             SlideSurface[] surfaces = UnityEngine.Object.FindObjectsOfType<SlideSurface>();
             foreach (var surface in surfaces)
             {
-                if (surface.isHeroAttached) surface.Detach(false);
+                // Reflection for private isHeroAttached
+                var isAttachedField = typeof(SlideSurface).GetField("isHeroAttached", BindingFlags.Instance | BindingFlags.NonPublic);
+                bool isAttached = (bool)(isAttachedField?.GetValue(surface) ?? false);
+
+                if (isAttached)
+                {
+                    // Reflection for private Detach
+                    var detachMethod = typeof(SlideSurface).GetMethod("Detach", BindingFlags.Instance | BindingFlags.NonPublic);
+                    detachMethod?.Invoke(surface, new object[] { false });
+                }
             }
 
             // 2. Load Dummy Scene ("Demo Start")
