@@ -597,11 +597,14 @@ namespace SilksongManager.Menu.Keybinds
             Plugin.Log.LogInfo("Keybinds screen shown");
         }
 
+        public static bool IsExiting => _isExiting;
+        private static bool _isExiting = false;
+
         public static IEnumerator Hide(UIManager ui)
         {
             if (_keybindsMenuScreen == null) yield break;
 
-            _isActive = false;
+            _isExiting = true;
 
             // NOTE: We return to SS Manager, not main menu
             // So we don't show main menu here (will be handled by MainMenuHook)
@@ -622,6 +625,8 @@ namespace SilksongManager.Menu.Keybinds
             }
 
             _keybindsMenuScreen.gameObject.SetActive(false);
+            _isActive = false;
+            _isExiting = false;
         }
     }
 
@@ -665,6 +670,8 @@ namespace SilksongManager.Menu.Keybinds
             // Check for Escape key
             if (Input.GetKeyDown(KeyCode.Escape))
             {
+                if (ModKeybindsScreen.IsExiting) return;
+
                 Plugin.Log.LogInfo("Escape pressed in keybinds menu, returning to SS Manager");
                 MainMenuHook.ReturnFromKeybindsScreen();
             }
