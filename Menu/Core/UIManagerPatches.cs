@@ -166,15 +166,9 @@ namespace SilksongManager.Menu.Core
                 UnityEngine.Object.DestroyImmediate(eventTrigger);
             }
 
-            // Setup button click via EventTrigger
-            eventTrigger = buttonGO.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-            var entry = new UnityEngine.EventSystems.EventTrigger.Entry
-            {
-                eventID = UnityEngine.EventSystems.EventTriggerType.Submit
-            };
-            entry.callback.AddListener((data) => OnSSManagerButtonPressed());
-            eventTrigger.triggers.Add(entry);
-
+            // Setup button click via MenuButton.OnSubmitPressed (like old MainMenuHook)
+            menuButton.OnSubmitPressed = new UnityEngine.Events.UnityEvent();
+            menuButton.OnSubmitPressed.AddListener(OnSSManagerButtonPressed);
             menuButton.buttonType = MenuButton.MenuButtonType.Activate;
 
             // Set button text
@@ -200,10 +194,63 @@ namespace SilksongManager.Menu.Core
             }
 
             Plugin.Log.LogInfo("SS Manager button added to main menu");
+
+            // Add custom credits text
+            AddCustomCredits();
+        }
+
+        private static void AddCustomCredits()
+        {
+            var texts = UnityEngine.Object.FindObjectsOfType<Text>();
+            foreach (var text in texts)
+            {
+                // Version string typically looks like "1.0.xxxxx"
+                if (text.text.Contains("1.0.") && text.text.Length < 20)
+                {
+                    Plugin.Log.LogInfo($"Found version text: {text.text}");
+
+                    var creditsObj = UnityEngine.Object.Instantiate(text.gameObject, text.transform.parent);
+                    creditsObj.name = "SSManagerCredits";
+
+                    // Remove any existing components that might interfere
+                    foreach (var comp in creditsObj.GetComponents<MonoBehaviour>())
+                    {
+                        if (comp is not Text)
+                        {
+                            UnityEngine.Object.Destroy(comp);
+                        }
+                    }
+
+                    var creditsText = creditsObj.GetComponent<Text>();
+                    creditsText.text = "Silksong Manager Edition\n<size=16>with <color=#ff6060>❤</color> by Catalyst</size>";
+                    creditsText.lineSpacing = 0.8f;
+                    creditsText.supportRichText = true;
+
+                    // Check for Layout Group
+                    var layoutGroup = text.transform.parent.GetComponent<VerticalLayoutGroup>();
+                    if (layoutGroup != null)
+                    {
+                        creditsObj.transform.SetSiblingIndex(text.transform.GetSiblingIndex() + 1);
+                        Plugin.Log.LogInfo("Added credits via LayoutGroup");
+                    }
+                    else
+                    {
+                        // Manual positioning
+                        var rect = creditsObj.GetComponent<RectTransform>();
+                        var originalRect = text.GetComponent<RectTransform>();
+                        rect.anchoredPosition = originalRect.anchoredPosition - new UnityEngine.Vector2(0, 45);
+                        Plugin.Log.LogInfo("Added credits via manual positioning");
+                    }
+                    return;
+                }
+            }
+            Plugin.Log.LogInfo("Could not find version text to attach credits to.");
         }
 
         private static void OnSSManagerButtonPressed()
         {
+            Plugin.Log.LogInfo("SS Manager button pressed!");
+
             // Create screen lazily
             if (_ssManagerScreen == null || _ssManagerScreen.Container == null)
             {
