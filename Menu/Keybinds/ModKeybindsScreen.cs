@@ -263,8 +263,8 @@ namespace SilksongManager.Menu.Keybinds
             contentObj.transform.SetParent(parent, false);
 
             var contentRect = contentObj.AddComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0.05f, 0.20f); // Shifted left (was 0.1)
-            contentRect.anchorMax = new Vector2(0.85f, 0.80f); // Shifted left (was 0.9)
+            contentRect.anchorMin = new Vector2(0.0f, 0.20f); // Shifted furher left (was 0.05)
+            contentRect.anchorMax = new Vector2(0.80f, 0.80f); // Shifted further left (was 0.85)
 
             contentRect.offsetMin = Vector2.zero;
             contentRect.offsetMax = Vector2.zero;
