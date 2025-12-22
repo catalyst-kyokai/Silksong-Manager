@@ -726,7 +726,8 @@ namespace SilksongManager.Menu
             ih?.StopUIInput();
 
             // Hide mod menu
-            yield return ui.StartCoroutine(HideMenu(_modMenuScreen, ui));
+            var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
+            yield return ui.StartCoroutine(FadeOutCanvasGroup(modCg, ui));
 
             // Initialize keybinds screen if needed
             ModKeybindsScreen.Initialize();
@@ -758,7 +759,14 @@ namespace SilksongManager.Menu
             yield return ui.StartCoroutine(ModKeybindsScreen.Hide(ui));
 
             // Show mod menu
-            yield return ui.StartCoroutine(ShowMenu(_modMenuScreen, ui));
+            var modCg = _modMenuScreen?.GetComponent<CanvasGroup>();
+            yield return ui.StartCoroutine(FadeInCanvasGroup(modCg, ui));
+
+            // Focus Keybinds button
+            if (_modMenuScreen?.defaultHighlight != null)
+            {
+                UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(_modMenuScreen.defaultHighlight.gameObject);
+            }
 
             ih?.StartUIInput();
         }

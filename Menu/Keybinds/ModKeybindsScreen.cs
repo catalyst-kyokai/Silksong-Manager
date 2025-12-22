@@ -4,60 +4,56 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 using Object = UnityEngine.Object;
 
 namespace SilksongManager.Menu.Keybinds
 {
     /// <summary>
-    /// Builds and manages the mod keybinds menu screen.
+    /// Builds and manages the mod keybinds menu screen by cloning the actual keyboard menu.
     /// </summary>
     public static class ModKeybindsScreen
     {
         private static MenuScreen _keybindsMenuScreen;
-        private static KeyConflictDialog _conflictDialog;
-        private static List<ModMappableKey> _mappableKeys = new List<ModMappableKey>();
+        private static List<ModMappableKeyEntry> _mappableEntries = new List<ModMappableKeyEntry>();
         private static bool _initialized = false;
-        
-        private static ModMappableKey _pendingRebindKey;
+        private static bool _isActive = false;
+
+        // Pending conflict resolution
+        private static ModMappableKeyEntry _pendingEntry;
         private static KeyCode _pendingKeyCode;
-        
+
         /// <summary>
-        /// Create the keybinds menu screen by cloning the keyboard menu.
+        /// Initialize by cloning the keyboard menu from the game.
         /// </summary>
         public static void Initialize()
         {
             if (_initialized) return;
-            
+
             try
             {
-                CreateKeybindsScreen();
+                CreateFromKeyboardMenu();
                 _initialized = true;
-                Plugin.Log.LogInfo("ModKeybindsScreen initialized");
+                Plugin.Log.LogInfo("ModKeybindsScreen initialized from keyboard menu");
             }
             catch (Exception e)
             {
                 Plugin.Log.LogError($"Failed to initialize ModKeybindsScreen: {e}");
             }
         }
-        
-        /// <summary>
-        /// Reset state when leaving menu scene.
-        /// </summary>
+
         public static void Reset()
         {
             _initialized = false;
             _keybindsMenuScreen = null;
-            _conflictDialog = null;
-            _mappableKeys.Clear();
-            _pendingRebindKey = null;
+            _mappableEntries.Clear();
+            _isActive = false;
         }
-        
-        /// <summary>
-        /// Get the keybinds menu screen.
-        /// </summary>
+
         public static MenuScreen GetScreen() => _keybindsMenuScreen;
-        
-        private static void CreateKeybindsScreen()
+        public static bool IsActive => _isActive;
+
+        private static void CreateFromKeyboardMenu()
         {
             var ui = UIManager.instance;
             if (ui == null)
@@ -65,19 +61,39 @@ namespace SilksongManager.Menu.Keybinds
                 Plugin.Log.LogError("UIManager not found!");
                 return;
             }
-            
-            // Clone keyboard menu as template (it has the right layout for keybinds)
-            MenuScreen templateScreen = ui.keyboardMenuScreen ?? ui.optionsMenuScreen;
-            if (templateScreen == null)
+
+            // Find the keyboard menu container via UIButtonSkins
+            var uibs = ui.uiButtonSkins;
+            if (uibs == null || uibs.mappableKeyboardButtons == null)
             {
-                Plugin.Log.LogError("Could not find template MenuScreen!");
+                Plugin.Log.LogError("UIButtonSkins or mappableKeyboardButtons not found!");
                 return;
             }
-            
-            // Clone
+
+            // The keyboard menu should be a parent of mappableKeyboardButtons
+            // Find the MenuScreen in the hierarchy
+            var keyboardPanel = uibs.mappableKeyboardButtons;
+            MenuScreen templateScreen = null;
+            Transform current = keyboardPanel;
+
+            while (current != null && templateScreen == null)
+            {
+                templateScreen = current.GetComponent<MenuScreen>();
+                if (templateScreen == null)
+                    current = current.parent;
+            }
+
+            if (templateScreen == null)
+            {
+                // Fallback: use options menu as template
+                templateScreen = ui.optionsMenuScreen;
+                Plugin.Log.LogWarning("Could not find keyboard MenuScreen, using options menu as fallback");
+            }
+
+            // Clone the screen
             var screenObj = Object.Instantiate(templateScreen.gameObject, templateScreen.transform.parent);
             screenObj.name = "ModKeybindsMenuScreen";
-            
+
             _keybindsMenuScreen = screenObj.GetComponent<MenuScreen>();
             if (_keybindsMenuScreen == null)
             {
@@ -85,7 +101,7 @@ namespace SilksongManager.Menu.Keybinds
                 Plugin.Log.LogError("Cloned screen doesn't have MenuScreen!");
                 return;
             }
-            
+
             // Hide initially
             screenObj.SetActive(false);
             var cg = screenObj.GetComponent<CanvasGroup>();
@@ -94,42 +110,38 @@ namespace SilksongManager.Menu.Keybinds
                 cg.alpha = 0f;
                 cg.interactable = false;
             }
-            
-            // Rebuild content
-            RebuildScreenContent(screenObj);
-            
-            // Create conflict dialog
-            _conflictDialog = KeyConflictDialog.Create(screenObj.transform);
-            
-            Plugin.Log.LogInfo("Keybinds menu screen created");
+
+            // Modify content
+            ModifyClonedScreen(screenObj);
+
+            Plugin.Log.LogInfo("Mod keybinds screen created successfully");
         }
-        
-        private static void RebuildScreenContent(GameObject screenObj)
+
+        private static void ModifyClonedScreen(GameObject screenObj)
         {
-            // First, save the backButton before destroying anything
-            MenuButton savedBackButton = null;
-            if (_keybindsMenuScreen.backButton != null)
+            // First, save backButton
+            MenuButton savedBackButton = _keybindsMenuScreen.backButton;
+            if (savedBackButton != null)
             {
-                savedBackButton = _keybindsMenuScreen.backButton;
                 savedBackButton.transform.SetParent(screenObj.transform, false);
                 savedBackButton.gameObject.SetActive(false);
             }
-            
-            // Destroy all children except saved ones
+
+            // Find and keep title and fleur, destroy everything else
             var toDestroy = new List<GameObject>();
             Transform titleTransform = null;
             Transform topFleurTransform = null;
-            
+
             foreach (Transform child in screenObj.transform)
             {
                 if (savedBackButton != null && child == savedBackButton.transform) continue;
-                
-                var childName = child.name.ToLower();
-                if (childName.Contains("title"))
+
+                var name = child.name.ToLower();
+                if (name.Contains("title"))
                 {
                     titleTransform = child;
                 }
-                else if (childName.Contains("fleur"))
+                else if (name.Contains("fleur"))
                 {
                     topFleurTransform = child;
                 }
@@ -138,69 +150,49 @@ namespace SilksongManager.Menu.Keybinds
                     toDestroy.Add(child.gameObject);
                 }
             }
-            
+
             foreach (var obj in toDestroy)
             {
                 Object.DestroyImmediate(obj);
             }
-            
-            // Configure title
+
+            // Set title
             if (titleTransform != null)
             {
                 titleTransform.gameObject.SetActive(true);
-                var titleText = titleTransform.GetComponent<Text>();
-                if (titleText != null)
+                DestroyLocalization(titleTransform.gameObject);
+                var textComp = titleTransform.GetComponent<Text>();
+                if (textComp != null)
                 {
-                    // Destroy localization
-                    foreach (var comp in titleTransform.GetComponents<MonoBehaviour>())
-                    {
-                        if (comp.GetType().Name.Contains("Locali"))
-                        {
-                            Object.DestroyImmediate(comp);
-                        }
-                    }
-                    titleText.text = "Mod Keybinds";
+                    textComp.text = "Mod Keybinds";
                 }
             }
-            
+
             // Enable fleur
             if (topFleurTransform != null)
             {
                 topFleurTransform.gameObject.SetActive(true);
             }
-            
-            // Create content container
-            var contentObj = new GameObject("ModKeybindsContent");
-            contentObj.transform.SetParent(screenObj.transform, false);
-            var contentRect = contentObj.AddComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0.1f, 0.2f);
-            contentRect.anchorMax = new Vector2(0.9f, 0.85f);
-            contentRect.offsetMin = Vector2.zero;
-            contentRect.offsetMax = Vector2.zero;
-            
-            // Add vertical layout
-            var layout = contentObj.AddComponent<VerticalLayoutGroup>();
-            layout.childAlignment = TextAnchor.UpperCenter;
-            layout.spacing = 8;
-            layout.childControlHeight = false;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = true;
-            
-            // Create keybind entries
-            _mappableKeys.Clear();
-            foreach (ModAction action in Enum.GetValues(typeof(ModAction)))
+
+            // Now clone ONE MappableKey from the actual keyboard menu as template
+            var uibs = UIManager.instance.uiButtonSkins;
+            MappableKey templateKey = null;
+            if (uibs != null && uibs.mappableKeyboardButtons != null)
             {
-                CreateKeybindEntry(contentObj.transform, action);
+                templateKey = uibs.mappableKeyboardButtons.GetComponentInChildren<MappableKey>(true);
             }
-            
+
+            // Create content container with layout
+            var contentObj = CreateContentContainer(screenObj.transform, templateKey);
+
             // Setup back button
             if (savedBackButton != null)
             {
+                savedBackButton.gameObject.SetActive(true);
                 savedBackButton.OnSubmitPressed = new UnityEvent();
                 savedBackButton.OnSubmitPressed.AddListener(OnBackButtonPressed);
-                savedBackButton.gameObject.SetActive(true);
-                
+                DestroyLocalization(savedBackButton.gameObject);
+
                 // Position at bottom
                 var backRect = savedBackButton.GetComponent<RectTransform>();
                 if (backRect != null)
@@ -210,184 +202,359 @@ namespace SilksongManager.Menu.Keybinds
                     backRect.pivot = new Vector2(0.5f, 0.5f);
                     backRect.anchoredPosition = new Vector2(0, 60);
                 }
-                
-                // Destroy localization
-                foreach (var comp in savedBackButton.GetComponents<MonoBehaviour>())
+
+                // Setup navigation
+                if (_mappableEntries.Count > 0)
                 {
-                    if (comp.GetType().Name.Contains("Locali"))
-                    {
-                        Object.DestroyImmediate(comp);
-                    }
-                }
-            }
-            
-            // Set navigation
-            if (_mappableKeys.Count > 0)
-            {
-                _keybindsMenuScreen.defaultHighlight = _mappableKeys[0];
-                
-                // Wire up navigation
-                for (int i = 0; i < _mappableKeys.Count; i++)
-                {
-                    var nav = _mappableKeys[i].navigation;
-                    nav.mode = Navigation.Mode.Explicit;
-                    nav.selectOnUp = i > 0 ? _mappableKeys[i - 1] : savedBackButton;
-                    nav.selectOnDown = i < _mappableKeys.Count - 1 ? _mappableKeys[i + 1] : savedBackButton;
-                    _mappableKeys[i].navigation = nav;
-                }
-                
-                if (savedBackButton != null)
-                {
+                    var lastEntry = _mappableEntries[_mappableEntries.Count - 1];
                     var backNav = savedBackButton.navigation;
                     backNav.mode = Navigation.Mode.Explicit;
-                    backNav.selectOnUp = _mappableKeys[_mappableKeys.Count - 1];
-                    backNav.selectOnDown = _mappableKeys[0];
+                    backNav.selectOnUp = lastEntry.button;
+                    backNav.selectOnDown = _mappableEntries[0].button;
                     savedBackButton.navigation = backNav;
                 }
             }
+
+            // Set default highlight
+            if (_mappableEntries.Count > 0)
+            {
+                _keybindsMenuScreen.defaultHighlight = _mappableEntries[0].button;
+            }
         }
-        
-        private static void CreateKeybindEntry(Transform parent, ModAction action)
+
+        private static GameObject CreateContentContainer(Transform parent, MappableKey templateKey)
         {
-            var entryObj = new GameObject($"Keybind_{action}");
+            // Create scrollable content
+            var contentObj = new GameObject("Content");
+            contentObj.transform.SetParent(parent, false);
+
+            var contentRect = contentObj.AddComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0.1f, 0.15f);
+            contentRect.anchorMax = new Vector2(0.9f, 0.85f);
+            contentRect.offsetMin = Vector2.zero;
+            contentRect.offsetMax = Vector2.zero;
+
+            // Create two-column layout
+            var leftColumn = CreateColumn(contentObj.transform, new Vector2(0, 0.5f), new Vector2(0.48f, 1f));
+            var rightColumn = CreateColumn(contentObj.transform, new Vector2(0.52f, 0.5f), new Vector2(1f, 1f));
+
+            // Get all actions
+            var actions = (ModAction[])Enum.GetValues(typeof(ModAction));
+            int halfCount = (actions.Length + 1) / 2;
+
+            _mappableEntries.Clear();
+
+            for (int i = 0; i < actions.Length; i++)
+            {
+                var column = i < halfCount ? leftColumn : rightColumn;
+                var entry = CreateKeybindEntry(column, actions[i], templateKey);
+                _mappableEntries.Add(entry);
+            }
+
+            // Setup navigation between entries
+            SetupNavigation();
+
+            return contentObj;
+        }
+
+        private static Transform CreateColumn(Transform parent, Vector2 anchorMin, Vector2 anchorMax)
+        {
+            var colObj = new GameObject("Column");
+            colObj.transform.SetParent(parent, false);
+
+            var colRect = colObj.AddComponent<RectTransform>();
+            colRect.anchorMin = anchorMin;
+            colRect.anchorMax = anchorMax;
+            colRect.offsetMin = Vector2.zero;
+            colRect.offsetMax = Vector2.zero;
+
+            var layout = colObj.AddComponent<VerticalLayoutGroup>();
+            layout.childAlignment = TextAnchor.UpperLeft;
+            layout.spacing = 8;
+            layout.childControlHeight = false;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.padding = new RectOffset(10, 10, 10, 10);
+
+            return colObj.transform;
+        }
+
+        private static ModMappableKeyEntry CreateKeybindEntry(Transform parent, ModAction action, MappableKey templateKey)
+        {
+            var entryObj = new GameObject($"Entry_{action}");
             entryObj.transform.SetParent(parent, false);
-            
+
             var entryRect = entryObj.AddComponent<RectTransform>();
-            entryRect.sizeDelta = new Vector2(0, 45);
-            
-            // Horizontal layout
+            entryRect.sizeDelta = new Vector2(0, 40);
+
+            // Horizontal layout like game
             var hLayout = entryObj.AddComponent<HorizontalLayoutGroup>();
             hLayout.childAlignment = TextAnchor.MiddleLeft;
             hLayout.spacing = 20;
-            hLayout.padding = new RectOffset(20, 20, 5, 5);
             hLayout.childControlWidth = false;
             hLayout.childControlHeight = true;
             hLayout.childForceExpandWidth = false;
-            
-            // Action label
+
+            // Label (left side)
             var labelObj = new GameObject("Label");
             labelObj.transform.SetParent(entryObj.transform, false);
             var labelRect = labelObj.AddComponent<RectTransform>();
-            labelRect.sizeDelta = new Vector2(250, 40);
-            
+            labelRect.sizeDelta = new Vector2(160, 35);
+            var labelLayout = labelObj.AddComponent<LayoutElement>();
+            labelLayout.preferredWidth = 160;
+
             var labelText = labelObj.AddComponent<Text>();
-            labelText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            labelText.fontSize = 24;
-            labelText.alignment = TextAnchor.MiddleLeft;
+            labelText.font = GetGameFont();
+            labelText.fontSize = 20;
+            labelText.fontStyle = FontStyle.Bold;
+            labelText.alignment = TextAnchor.MiddleRight;
             labelText.color = Color.white;
-            
-            // Key display button
+            labelText.text = ModKeybindManager.GetActionName(action);
+
+            // Key button (right side) - styled like game
             var keyBtnObj = new GameObject("KeyButton");
             keyBtnObj.transform.SetParent(entryObj.transform, false);
             var keyRect = keyBtnObj.AddComponent<RectTransform>();
-            keyRect.sizeDelta = new Vector2(120, 40);
-            
+            keyRect.sizeDelta = new Vector2(80, 35);
+            var keyLayout = keyBtnObj.AddComponent<LayoutElement>();
+            keyLayout.preferredWidth = 80;
+            keyLayout.preferredHeight = 35;
+
+            // Background image (styled like game keys)
+            var uibs = UIManager.instance?.uiButtonSkins;
             var keyBg = keyBtnObj.AddComponent<Image>();
-            keyBg.color = new Color(0.15f, 0.15f, 0.2f, 0.8f);
-            
+            keyBg.sprite = uibs?.squareKey;
+            keyBg.color = Color.white;
+            keyBg.type = Image.Type.Sliced;
+
             // Key text
-            var keyTextObj = new GameObject("KeyText");
+            var keyTextObj = new GameObject("Text");
             keyTextObj.transform.SetParent(keyBtnObj.transform, false);
             var keyTextRect = keyTextObj.AddComponent<RectTransform>();
             keyTextRect.anchorMin = Vector2.zero;
             keyTextRect.anchorMax = Vector2.one;
-            keyTextRect.offsetMin = new Vector2(5, 0);
-            keyTextRect.offsetMax = new Vector2(-5, 0);
-            
+            keyTextRect.offsetMin = Vector2.zero;
+            keyTextRect.offsetMax = Vector2.zero;
+
             var keyText = keyTextObj.AddComponent<Text>();
-            keyText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            keyText.fontSize = 22;
+            keyText.font = GetGameFont();
+            keyText.fontSize = 18;
+            keyText.fontStyle = FontStyle.Bold;
             keyText.alignment = TextAnchor.MiddleCenter;
-            keyText.color = new Color(0.9f, 0.85f, 0.7f);
-            
-            // Add ModMappableKey component
-            var mappableKey = keyBtnObj.AddComponent<ModMappableKey>();
-            mappableKey.Initialize(action, labelText, keyText, keyBg, OnKeySelected);
-            
-            _mappableKeys.Add(mappableKey);
+            keyText.color = Color.black;
+
+            // Add button component
+            var button = keyBtnObj.AddComponent<MenuButton>();
+            button.OnSubmitPressed = new UnityEvent();
+
+            var entry = new ModMappableKeyEntry
+            {
+                action = action,
+                button = button,
+                keyText = keyText,
+                keyBg = keyBg,
+                isListening = false
+            };
+
+            // Set click handler
+            button.OnSubmitPressed.AddListener(() => OnKeyEntryClicked(entry));
+
+            // Display current keybind
+            UpdateEntryDisplay(entry);
+
+            return entry;
         }
-        
-        private static void OnKeySelected(ModMappableKey mappableKey, KeyCode key)
+
+        private static void SetupNavigation()
         {
-            // Check for conflicts with other mod keybinds
-            if (ModKeybindManager.IsModKeybindConflicting(key, mappableKey.Action, out ModAction conflictAction))
+            for (int i = 0; i < _mappableEntries.Count; i++)
             {
-                // Show conflict dialog
-                _pendingRebindKey = mappableKey;
-                _pendingKeyCode = key;
-                
-                string conflictName = ModKeybindManager.GetActionName(conflictAction);
-                _conflictDialog.Show(key, conflictName, 
-                    () => OnConflictCombine(conflictAction),
-                    () => OnConflictReplace(conflictAction),
-                    OnConflictCancel);
-                return;
+                var entry = _mappableEntries[i];
+                var nav = entry.button.navigation;
+                nav.mode = Navigation.Mode.Explicit;
+
+                // Up: previous entry or wrap to back button
+                if (i > 0)
+                    nav.selectOnUp = _mappableEntries[i - 1].button;
+                else if (_keybindsMenuScreen.backButton != null)
+                    nav.selectOnUp = _keybindsMenuScreen.backButton;
+
+                // Down: next entry or back button
+                if (i < _mappableEntries.Count - 1)
+                    nav.selectOnDown = _mappableEntries[i + 1].button;
+                else if (_keybindsMenuScreen.backButton != null)
+                    nav.selectOnDown = _keybindsMenuScreen.backButton;
+
+                entry.button.navigation = nav;
             }
-            
-            // Check for game keybind conflicts
-            if (ModKeybindManager.IsGameKeybindConflicting(key, out string gameAction))
-            {
-                _pendingRebindKey = mappableKey;
-                _pendingKeyCode = key;
-                
-                _conflictDialog.Show(key, $"Game: {gameAction}", 
-                    () => OnConflictCombine(default), // Combine with game action (just apply)
-                    () => OnConflictCombine(default), // Replace doesn't make sense for game binds
-                    OnConflictCancel);
-                return;
-            }
-            
-            // No conflict, apply directly
-            mappableKey.ApplyKeybind(key);
         }
-        
-        private static void OnConflictCombine(ModAction conflictAction)
+
+        private static void OnKeyEntryClicked(ModMappableKeyEntry entry)
         {
-            // Just apply the new keybind (both actions will fire on same key)
-            if (_pendingRebindKey != null)
-            {
-                _pendingRebindKey.ApplyKeybind(_pendingKeyCode);
-                _pendingRebindKey = null;
-            }
+            if (entry.isListening) return;
+
+            // Start listening for new key
+            entry.isListening = true;
+            entry.keyText.text = "...";
+
+            // Start listening coroutine
+            UIManager.instance.StartCoroutine(ListenForKey(entry));
         }
-        
-        private static void OnConflictReplace(ModAction conflictAction)
+
+        private static IEnumerator ListenForKey(ModMappableKeyEntry entry)
         {
-            // Remove keybind from conflicting action, apply to new action
-            ModKeybindManager.SetKeybind(conflictAction, KeyCode.None);
-            
-            if (_pendingRebindKey != null)
+            yield return null;
+            yield return null;
+
+            while (entry.isListening)
             {
-                _pendingRebindKey.ApplyKeybind(_pendingKeyCode);
-                _pendingRebindKey = null;
-            }
-            
-            // Refresh all displays
-            foreach (var mk in _mappableKeys)
-            {
-                mk.ShowCurrentBinding();
+                if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    entry.isListening = false;
+                    UpdateEntryDisplay(entry);
+                    yield break;
+                }
+
+                foreach (KeyCode key in Enum.GetValues(typeof(KeyCode)))
+                {
+                    if (key == KeyCode.None || key == KeyCode.Mouse0 || key == KeyCode.Mouse1) continue;
+                    if (key == KeyCode.Escape) continue;
+
+                    if (Input.GetKeyDown(key))
+                    {
+                        entry.isListening = false;
+                        HandleKeySelected(entry, key);
+                        yield break;
+                    }
+                }
+
+                yield return null;
             }
         }
-        
-        private static void OnConflictCancel()
+
+        private static void HandleKeySelected(ModMappableKeyEntry entry, KeyCode key)
         {
-            // Just cancel, restore original
-            if (_pendingRebindKey != null)
+            // Check conflicts with other mod keybinds
+            if (ModKeybindManager.IsModKeybindConflicting(key, entry.action, out ModAction conflicting))
             {
-                _pendingRebindKey.ShowCurrentBinding();
-                _pendingRebindKey = null;
+                // For now, just replace (can add dialog later)
+                ModKeybindManager.SetKeybind(conflicting, KeyCode.None);
+                RefreshAllDisplays();
+            }
+
+            // Apply the new keybind
+            ModKeybindManager.SetKeybind(entry.action, key);
+            UpdateEntryDisplay(entry);
+        }
+
+        private static void UpdateEntryDisplay(ModMappableKeyEntry entry)
+        {
+            var key = ModKeybindManager.GetKeybind(entry.action);
+            entry.keyText.text = KeyCodeToShortString(key);
+
+            // Update background sprite based on key type
+            var uibs = UIManager.instance?.uiButtonSkins;
+            if (uibs != null)
+            {
+                if (key == KeyCode.None)
+                {
+                    entry.keyBg.sprite = uibs.blankKey;
+                }
+                else if (IsWideKey(key))
+                {
+                    entry.keyBg.sprite = uibs.rectangleKey;
+                }
+                else
+                {
+                    entry.keyBg.sprite = uibs.squareKey;
+                }
             }
         }
-        
+
+        private static void RefreshAllDisplays()
+        {
+            foreach (var entry in _mappableEntries)
+            {
+                UpdateEntryDisplay(entry);
+            }
+        }
+
         private static void OnBackButtonPressed()
         {
-            Plugin.Log.LogInfo("Back button pressed from Keybinds screen");
+            Plugin.Log.LogInfo("Back from Keybinds screen");
             MainMenuHook.ReturnFromKeybindsScreen();
         }
-        
-        /// <summary>
-        /// Show the keybinds screen.
-        /// </summary>
+
+        private static Font GetGameFont()
+        {
+            // Try to get the game's font
+            var existingText = Object.FindAnyObjectByType<Text>();
+            if (existingText != null)
+                return existingText.font;
+            return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+
+        private static void DestroyLocalization(GameObject obj)
+        {
+            if (obj == null) return;
+            foreach (var comp in obj.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                if (comp != null && comp.GetType().Name.Contains("Locali"))
+                {
+                    Object.DestroyImmediate(comp);
+                }
+            }
+        }
+
+        private static bool IsWideKey(KeyCode key)
+        {
+            return key == KeyCode.Space || key == KeyCode.Tab || key == KeyCode.Return ||
+                   key == KeyCode.LeftShift || key == KeyCode.RightShift ||
+                   key == KeyCode.LeftControl || key == KeyCode.RightControl ||
+                   key == KeyCode.LeftAlt || key == KeyCode.RightAlt ||
+                   key == KeyCode.Backspace;
+        }
+
+        private static string KeyCodeToShortString(KeyCode key)
+        {
+            if (key == KeyCode.None) return "---";
+
+            return key switch
+            {
+                KeyCode.Alpha0 => "0",
+                KeyCode.Alpha1 => "1",
+                KeyCode.Alpha2 => "2",
+                KeyCode.Alpha3 => "3",
+                KeyCode.Alpha4 => "4",
+                KeyCode.Alpha5 => "5",
+                KeyCode.Alpha6 => "6",
+                KeyCode.Alpha7 => "7",
+                KeyCode.Alpha8 => "8",
+                KeyCode.Alpha9 => "9",
+                KeyCode.Keypad0 => "Num0",
+                KeyCode.Keypad1 => "Num1",
+                KeyCode.Keypad2 => "Num2",
+                KeyCode.Keypad3 => "Num3",
+                KeyCode.Keypad4 => "Num4",
+                KeyCode.Keypad5 => "Num5",
+                KeyCode.Keypad6 => "Num6",
+                KeyCode.Keypad7 => "Num7",
+                KeyCode.Keypad8 => "Num8",
+                KeyCode.Keypad9 => "Num9",
+                KeyCode.LeftShift => "LShift",
+                KeyCode.RightShift => "RShift",
+                KeyCode.LeftControl => "LCtrl",
+                KeyCode.RightControl => "RCtrl",
+                KeyCode.Space => "Space",
+                KeyCode.Tab => "Tab",
+                KeyCode.Return => "Enter",
+                KeyCode.Backspace => "Bksp",
+                KeyCode.Escape => "Esc",
+                _ => key.ToString().Length > 5 ? key.ToString().Substring(0, 5) : key.ToString()
+            };
+        }
+
         public static IEnumerator Show(UIManager ui)
         {
             if (_keybindsMenuScreen == null)
@@ -395,20 +562,18 @@ namespace SilksongManager.Menu.Keybinds
                 Plugin.Log.LogError("Keybinds screen not initialized!");
                 yield break;
             }
-            
-            // Refresh all keybind displays
-            foreach (var mk in _mappableKeys)
-            {
-                mk.ShowCurrentBinding();
-            }
-            
+
+            _isActive = true;
+            RefreshAllDisplays();
+
             var cg = _keybindsMenuScreen.GetComponent<CanvasGroup>();
+            _keybindsMenuScreen.gameObject.SetActive(true);
+
             if (cg != null)
             {
-                _keybindsMenuScreen.gameObject.SetActive(true);
                 cg.interactable = true;
                 cg.blocksRaycasts = true;
-                
+
                 float alpha = 0f;
                 while (alpha < 1f)
                 {
@@ -418,25 +583,20 @@ namespace SilksongManager.Menu.Keybinds
                 }
                 cg.alpha = 1f;
             }
-            else
+
+            // Focus first entry
+            if (_mappableEntries.Count > 0)
             {
-                _keybindsMenuScreen.gameObject.SetActive(true);
-            }
-            
-            // Focus first element
-            if (_mappableKeys.Count > 0)
-            {
-                UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(_mappableKeys[0].gameObject);
+                EventSystem.current?.SetSelectedGameObject(_mappableEntries[0].button.gameObject);
             }
         }
-        
-        /// <summary>
-        /// Hide the keybinds screen.
-        /// </summary>
+
         public static IEnumerator Hide(UIManager ui)
         {
             if (_keybindsMenuScreen == null) yield break;
-            
+
+            _isActive = false;
+
             var cg = _keybindsMenuScreen.GetComponent<CanvasGroup>();
             if (cg != null)
             {
@@ -451,8 +611,20 @@ namespace SilksongManager.Menu.Keybinds
                 cg.interactable = false;
                 cg.blocksRaycasts = false;
             }
-            
+
             _keybindsMenuScreen.gameObject.SetActive(false);
         }
+    }
+
+    /// <summary>
+    /// Internal struct to track a keybind entry.
+    /// </summary>
+    internal class ModMappableKeyEntry
+    {
+        public ModAction action;
+        public MenuButton button;
+        public Text keyText;
+        public Image keyBg;
+        public bool isListening;
     }
 }
