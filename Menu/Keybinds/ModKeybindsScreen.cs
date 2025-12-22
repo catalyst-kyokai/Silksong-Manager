@@ -156,7 +156,8 @@ namespace SilksongManager.Menu.Keybinds
                 var textComp = titleTransform.GetComponent<Text>();
                 if (textComp != null)
                 {
-                    textComp.text = "Mod Keybinds";
+                    textComp.text = "KEYBINDS";
+                    _gameFont = textComp.font;
                 }
             }
 
@@ -207,12 +208,53 @@ namespace SilksongManager.Menu.Keybinds
                 }
             }
 
+            // Create Reset Button (above back button)
+            if (savedBackButton != null)
+            {
+                var resetBtn = Object.Instantiate(savedBackButton.gameObject, savedBackButton.transform.parent);
+                resetBtn.name = "ResetButton";
+                resetBtn.SetActive(true);
+
+                // Remove existing click listeners
+                var menuBtn = resetBtn.GetComponent<MenuButton>();
+                if (menuBtn != null)
+                {
+                    menuBtn.OnSubmitPressed = new UnityEvent();
+                    menuBtn.OnSubmitPressed.AddListener(() =>
+                    {
+                        ModKeybindManager.ResetToDefaults();
+                        RefreshAllDisplays();
+                    });
+                }
+
+                // Change text
+                var txt = resetBtn.GetComponentInChildren<Text>();
+                if (txt != null)
+                {
+                    txt.text = "RESET TO DEFAULTS";
+                }
+
+                // Position
+                var rect = resetBtn.GetComponent<RectTransform>();
+                if (rect != null)
+                {
+                    rect.anchorMin = new Vector2(0.5f, 0);
+                    rect.anchorMax = new Vector2(0.5f, 0);
+                    rect.pivot = new Vector2(0.5f, 0.5f);
+                    rect.anchoredPosition = new Vector2(0, 120); // Above back button
+                }
+
+                _resetButton = menuBtn;
+            }
+
             // Set default highlight
             if (_mappableEntries.Count > 0)
             {
                 _keybindsMenuScreen.defaultHighlight = _mappableEntries[0].button;
             }
         }
+
+        private static MenuButton _resetButton;
 
         private static GameObject CreateContentContainer(Transform parent, MappableKey templateKey)
         {
@@ -221,8 +263,9 @@ namespace SilksongManager.Menu.Keybinds
             contentObj.transform.SetParent(parent, false);
 
             var contentRect = contentObj.AddComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0.1f, 0.15f);
-            contentRect.anchorMax = new Vector2(0.9f, 0.85f);
+            contentRect.anchorMin = new Vector2(0.1f, 0.20f); // Higher bottom to make room for Reset button
+            contentRect.anchorMax = new Vector2(0.9f, 0.80f); // Lower top for Title
+
             contentRect.offsetMin = Vector2.zero;
             contentRect.offsetMax = Vector2.zero;
 
@@ -298,11 +341,11 @@ namespace SilksongManager.Menu.Keybinds
 
             var labelText = labelObj.AddComponent<Text>();
             labelText.font = GetGameFont();
-            labelText.fontSize = 26;
+            labelText.fontSize = 32; // Larger font
             labelText.fontStyle = FontStyle.Normal;
             labelText.alignment = TextAnchor.MiddleRight;
             labelText.color = Color.white;
-            labelText.text = ModKeybindManager.GetActionName(action);
+            labelText.text = ModKeybindManager.GetActionName(action).ToUpper(); // UPPERCASE
 
             // Key button (right side) - styled like game
             var keyBtnObj = new GameObject("KeyButton");
@@ -372,13 +415,39 @@ namespace SilksongManager.Menu.Keybinds
                 else if (_keybindsMenuScreen.backButton != null)
                     nav.selectOnUp = _keybindsMenuScreen.backButton;
 
-                // Down: next entry or back button
+                // Down: next entry or Reset button
                 if (i < _mappableEntries.Count - 1)
                     nav.selectOnDown = _mappableEntries[i + 1].button;
-                else if (_keybindsMenuScreen.backButton != null)
-                    nav.selectOnDown = _keybindsMenuScreen.backButton;
+                else if (_resetButton != null)
+                    nav.selectOnDown = _resetButton;
 
                 entry.button.navigation = nav;
+            }
+
+            // Setup Reset Button navigation
+            if (_resetButton != null)
+            {
+                var nav = _resetButton.navigation;
+                nav.mode = Navigation.Mode.Explicit;
+
+                // Up: last entries
+                if (_mappableEntries.Count > 0)
+                    nav.selectOnUp = _mappableEntries[_mappableEntries.Count - 1].button;
+
+                // Down: Back button
+                if (_keybindsMenuScreen.backButton != null)
+                    nav.selectOnDown = _keybindsMenuScreen.backButton;
+
+                _resetButton.navigation = nav;
+            }
+
+            // Fix Back Button navigation to point up to Reset
+            if (_keybindsMenuScreen.backButton != null)
+            {
+                var nav = _keybindsMenuScreen.backButton.navigation;
+                if (_resetButton != null)
+                    nav.selectOnUp = _resetButton;
+                _keybindsMenuScreen.backButton.navigation = nav;
             }
         }
 
@@ -478,8 +547,12 @@ namespace SilksongManager.Menu.Keybinds
             MainMenuHook.ReturnFromKeybindsScreen();
         }
 
+        private static Font _gameFont;
+
         private static Font GetGameFont()
         {
+            if (_gameFont != null) return _gameFont;
+
             // Try to get the game's font
             var existingText = Object.FindAnyObjectByType<Text>();
             if (existingText != null)
