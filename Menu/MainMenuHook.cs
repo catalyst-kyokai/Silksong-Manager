@@ -1,20 +1,21 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
-using UnityEngine.EventSystems;
 using Object = UnityEngine.Object;
 
 namespace SilksongManager.Menu
 {
     /// <summary>
-    /// Hooks into the main menu to add the SS Manager button.
+    /// Hooks into the main menu to add the SS Manager button and menu screen.
     /// </summary>
     public static class MainMenuHook
     {
         private static bool _initialized = false;
         private static GameObject _ssManagerButton;
-        private static ModMenuScreen _modMenuScreen;
+        private static MenuScreen _modMenuScreen;
+        private static bool _isInModMenu = false;
 
         /// <summary>
         /// Initialize the main menu hook. Called when menu scene loads.
@@ -32,8 +33,9 @@ namespace SilksongManager.Menu
                     return;
                 }
 
-                CreateSSManagerButton(mainMenuOptions);
                 CreateModMenuScreen();
+                CreateSSManagerButton(mainMenuOptions);
+
                 _initialized = true;
                 Plugin.Log.LogInfo("Main menu hook initialized successfully!");
             }
@@ -51,11 +53,12 @@ namespace SilksongManager.Menu
             _initialized = false;
             _ssManagerButton = null;
             _modMenuScreen = null;
+            _isInModMenu = false;
         }
 
         private static void CreateSSManagerButton(MainMenuOptions mainMenuOptions)
         {
-            // Find a button to clone - prefer extrasButton, fallback to optionsButton
+            // Find the extras button to clone (it has the right style)
             MenuButton templateButton = mainMenuOptions.extrasButton;
             if (templateButton == null)
             {
@@ -85,17 +88,30 @@ namespace SilksongManager.Menu
             menuButton.OnSubmitPressed = new UnityEvent();
             menuButton.OnSubmitPressed.AddListener(OnSSManagerButtonPressed);
 
-            // Change the button text
+            // Change the button text and DISABLE localization
             SetButtonText(_ssManagerButton, "SS Manager");
 
-            // Position the button after the last visible button (before quit)
-            PositionButton(mainMenuOptions, menuButton);
+            // Position the button BETWEEN Extras and Quit
+            PositionButtonCorrectly(mainMenuOptions, menuButton);
 
             Plugin.Log.LogInfo("SS Manager button created successfully!");
         }
 
         private static void SetButtonText(GameObject buttonObj, string text)
         {
+            // Find and disable any LocalizedTextMesh or similar localization components
+            var localizers = buttonObj.GetComponentsInChildren<MonoBehaviour>();
+            foreach (var loc in localizers)
+            {
+                // Check for localization components by name
+                var typeName = loc.GetType().Name;
+                if (typeName.Contains("Locali") || typeName.Contains("Translat"))
+                {
+                    loc.enabled = false;
+                    Plugin.Log.LogInfo($"Disabled localization component: {typeName}");
+                }
+            }
+
             // Try to find Text component in children
             var textComponent = buttonObj.GetComponentInChildren<Text>();
             if (textComponent != null)
@@ -115,81 +131,61 @@ namespace SilksongManager.Menu
             Plugin.Log.LogWarning("Could not find text component on button!");
         }
 
-        private static void PositionButton(MainMenuOptions mainMenuOptions, MenuButton ssManagerButton)
+        private static void PositionButtonCorrectly(MainMenuOptions mainMenuOptions, MenuButton ssManagerButton)
         {
-            // Get the quitButton as reference for positioning
-            var quitButton = mainMenuOptions.quitButton;
+            // Get buttons as references
             var extrasButton = mainMenuOptions.extrasButton;
+            var quitButton = mainMenuOptions.quitButton;
 
-            if (quitButton == null)
+            if (extrasButton == null || quitButton == null)
             {
-                Plugin.Log.LogWarning("Quit button not found for positioning reference");
+                Plugin.Log.LogWarning("Could not find extras or quit button for positioning");
                 return;
             }
 
             // Get RectTransforms
             var ssRect = ssManagerButton.GetComponent<RectTransform>();
+            var extrasRect = extrasButton.GetComponent<RectTransform>();
             var quitRect = quitButton.GetComponent<RectTransform>();
-            var templateRect = (extrasButton ?? mainMenuOptions.optionsButton).GetComponent<RectTransform>();
 
-            if (ssRect == null || quitRect == null || templateRect == null)
+            if (ssRect == null || extrasRect == null || quitRect == null)
             {
                 Plugin.Log.LogWarning("Could not get RectTransforms for positioning");
                 return;
             }
 
-            // Calculate vertical spacing between buttons
-            float spacing = 0f;
-            if (extrasButton != null && mainMenuOptions.optionsButton != null)
-            {
-                var extrasRect = extrasButton.GetComponent<RectTransform>();
-                var optionsRect = mainMenuOptions.optionsButton.GetComponent<RectTransform>();
-                spacing = optionsRect.anchoredPosition.y - extrasRect.anchoredPosition.y;
-            }
-            else
-            {
-                spacing = 60f; // Default spacing
-            }
+            // Calculate the spacing between buttons
+            float spacing = extrasRect.anchoredPosition.y - quitRect.anchoredPosition.y;
 
-            // Position our button above the quit button
-            var quitPos = quitRect.anchoredPosition;
-            ssRect.anchoredPosition = new Vector2(quitPos.x, quitPos.y + spacing);
+            // Position our button where Quit currently is
+            var quitOriginalPos = quitRect.anchoredPosition;
+            ssRect.anchoredPosition = quitOriginalPos;
 
-            // Move quit button down
-            quitRect.anchoredPosition = new Vector2(quitPos.x, quitPos.y);
-
-            // Actually, let's insert between extras and quit
-            // Move quit button down to make room
-            quitRect.anchoredPosition = new Vector2(quitPos.x, quitPos.y - spacing);
-
-            // Setup navigation
-            SetupNavigation(mainMenuOptions, ssManagerButton);
-        }
-
-        private static void SetupNavigation(MainMenuOptions mainMenuOptions, MenuButton ssManagerButton)
-        {
-            // Get references
-            var quitButton = mainMenuOptions.quitButton;
-            var extrasButton = mainMenuOptions.extrasButton ?? mainMenuOptions.achievementsButton ?? mainMenuOptions.optionsButton;
-
-            if (extrasButton == null || quitButton == null) return;
+            // Move Quit button down by the same spacing
+            quitRect.anchoredPosition = new Vector2(quitOriginalPos.x, quitOriginalPos.y - spacing);
 
             // Setup navigation: Extras -> SSManager -> Quit
-            var extrasNav = extrasButton.navigation;
-            var ssManagerNav = ssManagerButton.navigation;
-            var quitNav = quitButton.navigation;
+            SetupNavigation(extrasButton, ssManagerButton, quitButton);
 
-            // Extras points down to SSManager
+            Plugin.Log.LogInfo($"Button positioned at Y={ssRect.anchoredPosition.y}, Quit moved to Y={quitRect.anchoredPosition.y}");
+        }
+
+        private static void SetupNavigation(MenuButton extrasButton, MenuButton ssManagerButton, MenuButton quitButton)
+        {
+            // Extras: down goes to SS Manager
+            var extrasNav = extrasButton.navigation;
             extrasNav.selectOnDown = ssManagerButton;
             extrasButton.navigation = extrasNav;
 
-            // SSManager: up to Extras, down to Quit
+            // SS Manager: up goes to Extras, down goes to Quit
+            var ssManagerNav = ssManagerButton.navigation;
             ssManagerNav.mode = Navigation.Mode.Explicit;
             ssManagerNav.selectOnUp = extrasButton;
             ssManagerNav.selectOnDown = quitButton;
             ssManagerButton.navigation = ssManagerNav;
 
-            // Quit points up to SSManager
+            // Quit: up goes to SS Manager
+            var quitNav = quitButton.navigation;
             quitNav.selectOnUp = ssManagerButton;
             quitButton.navigation = quitNav;
         }
@@ -197,25 +193,338 @@ namespace SilksongManager.Menu
         private static void OnSSManagerButtonPressed()
         {
             Plugin.Log.LogInfo("SS Manager button pressed!");
-            
-            if (_modMenuScreen != null)
+
+            // Use UIManager to transition to our menu screen
+            var ui = UIManager.instance;
+            if (ui != null && _modMenuScreen != null)
             {
-                _modMenuScreen.Show();
+                ui.StartCoroutine(GoToModMenu(ui));
             }
             else
             {
-                Plugin.Log.LogWarning("ModMenuScreen not initialized!");
+                Plugin.Log.LogWarning("UIManager or ModMenuScreen not available!");
             }
         }
 
+        private static IEnumerator GoToModMenu(UIManager ui)
+        {
+            _isInModMenu = true;
+
+            // Stop UI input during transition
+            var ih = GameManager.instance?.inputHandler;
+            ih?.StopUIInput();
+
+            // Fade out main menu like other menus do
+            ui.StartCoroutine(FadeOutSprite(ui.gameTitle));
+
+            // Try to fade out subtitle (uses PlayMaker, optional)
+            try
+            {
+                var subtitleFSM = ui.GetType().GetField("subtitleFSM")?.GetValue(ui);
+                if (subtitleFSM != null)
+                {
+                    var sendEventMethod = subtitleFSM.GetType().GetMethod("SendEvent", new[] { typeof(string) });
+                    sendEventMethod?.Invoke(subtitleFSM, new object[] { "FADE OUT" });
+                }
+            }
+            catch { /* PlayMaker not available */ }
+
+            yield return ui.StartCoroutine(FadeOutCanvasGroup(ui.mainMenuScreen, ui));
+
+            // Show our menu screen
+            yield return ui.StartCoroutine(ShowMenu(_modMenuScreen, ui));
+
+            ih?.StartUIInput();
+        }
+
+        public static IEnumerator ReturnToMainMenu(UIManager ui)
+        {
+            _isInModMenu = false;
+
+            var ih = GameManager.instance?.inputHandler;
+            ih?.StopUIInput();
+
+            // Hide our menu
+            yield return ui.StartCoroutine(HideMenu(_modMenuScreen, ui));
+
+            // Show main menu
+            yield return ui.StartCoroutine(FadeInCanvasGroup(ui.mainMenuScreen, ui));
+
+            // Fade in title
+            ui.StartCoroutine(FadeInSprite(ui.gameTitle));
+
+            // Try to fade in subtitle (uses PlayMaker, optional)
+            try
+            {
+                var subtitleFSM = ui.GetType().GetField("subtitleFSM")?.GetValue(ui);
+                if (subtitleFSM != null)
+                {
+                    var sendEventMethod = subtitleFSM.GetType().GetMethod("SendEvent", new[] { typeof(string) });
+                    sendEventMethod?.Invoke(subtitleFSM, new object[] { "FADE IN" });
+                }
+            }
+            catch { /* PlayMaker not available */ }
+
+            ih?.StartUIInput();
+        }
+
+        public static bool IsInModMenu => _isInModMenu;
+
+        #region UI Transition Helpers (mimicking UIManager methods)
+
+        private static IEnumerator FadeOutSprite(SpriteRenderer sprite)
+        {
+            if (sprite == null) yield break;
+
+            float alpha = sprite.color.a;
+            while (alpha > 0.05f)
+            {
+                alpha -= Time.unscaledDeltaTime * 3.2f;
+                sprite.color = new Color(sprite.color.r, sprite.color.g, sprite.color.b, alpha);
+                yield return null;
+            }
+            sprite.color = new Color(sprite.color.r, sprite.color.g, sprite.color.b, 0f);
+        }
+
+        private static IEnumerator FadeInSprite(SpriteRenderer sprite)
+        {
+            if (sprite == null) yield break;
+
+            float alpha = sprite.color.a;
+            while (alpha < 0.95f)
+            {
+                alpha += Time.unscaledDeltaTime * 3.2f;
+                sprite.color = new Color(sprite.color.r, sprite.color.g, sprite.color.b, alpha);
+                yield return null;
+            }
+            sprite.color = new Color(sprite.color.r, sprite.color.g, sprite.color.b, 1f);
+        }
+
+        private static IEnumerator FadeOutCanvasGroup(CanvasGroup cg, UIManager ui)
+        {
+            if (cg == null) yield break;
+
+            float loopFailsafe = 0f;
+            while (cg.alpha > 0.05f)
+            {
+                cg.alpha -= Time.unscaledDeltaTime * ui.MENU_FADE_SPEED;
+                loopFailsafe += Time.unscaledDeltaTime;
+                if (loopFailsafe >= 2f) break;
+                yield return null;
+            }
+            cg.alpha = 0f;
+            cg.interactable = false;
+            cg.gameObject.SetActive(false);
+        }
+
+        private static IEnumerator FadeInCanvasGroup(CanvasGroup cg, UIManager ui)
+        {
+            if (cg == null) yield break;
+
+            cg.gameObject.SetActive(true);
+            cg.alpha = 0f;
+            float loopFailsafe = 0f;
+
+            while (cg.alpha < 0.95f)
+            {
+                cg.alpha += Time.unscaledDeltaTime * ui.MENU_FADE_SPEED;
+                loopFailsafe += Time.unscaledDeltaTime;
+                if (loopFailsafe >= 2f) break;
+                yield return null;
+            }
+            cg.alpha = 1f;
+            cg.interactable = true;
+        }
+
+        private static IEnumerator ShowMenu(MenuScreen menu, UIManager ui)
+        {
+            if (menu == null) yield break;
+
+            var cg = menu.GetComponent<CanvasGroup>();
+            if (cg != null)
+            {
+                yield return ui.StartCoroutine(FadeInCanvasGroup(cg, ui));
+            }
+            else
+            {
+                menu.gameObject.SetActive(true);
+            }
+
+            // Highlight default button
+            if (menu.HighlightBehaviour == MenuScreen.HighlightDefaultBehaviours.AfterFade)
+            {
+                menu.HighlightDefault();
+            }
+        }
+
+        private static IEnumerator HideMenu(MenuScreen menu, UIManager ui)
+        {
+            if (menu == null) yield break;
+
+            var cg = menu.GetComponent<CanvasGroup>();
+            if (cg != null)
+            {
+                yield return ui.StartCoroutine(FadeOutCanvasGroup(cg, ui));
+            }
+            else
+            {
+                menu.gameObject.SetActive(false);
+            }
+        }
+
+        #endregion
+
         private static void CreateModMenuScreen()
         {
-            // Create a GameObject for the mod menu screen
-            var screenObj = new GameObject("SSManagerMenuScreen");
-            Object.DontDestroyOnLoad(screenObj);
-            
-            _modMenuScreen = screenObj.AddComponent<ModMenuScreen>();
-            _modMenuScreen.Initialize();
+            // Find an existing MenuScreen to clone as template
+            var ui = UIManager.instance;
+            if (ui == null)
+            {
+                Plugin.Log.LogError("UIManager not found!");
+                return;
+            }
+
+            // Clone extrasMenuScreen as our template
+            MenuScreen templateScreen = ui.extrasMenuScreen ?? ui.optionsMenuScreen;
+            if (templateScreen == null)
+            {
+                Plugin.Log.LogError("Could not find template MenuScreen to clone!");
+                return;
+            }
+
+            // Clone the menu screen
+            var screenObj = Object.Instantiate(templateScreen.gameObject, templateScreen.transform.parent);
+            screenObj.name = "SSManagerMenuScreen";
+
+            _modMenuScreen = screenObj.GetComponent<MenuScreen>();
+            if (_modMenuScreen == null)
+            {
+                Plugin.Log.LogError("Cloned screen doesn't have MenuScreen component!");
+                Object.Destroy(screenObj);
+                return;
+            }
+
+            // Start hidden
+            screenObj.SetActive(false);
+            var cg = screenObj.GetComponent<CanvasGroup>();
+            if (cg != null)
+            {
+                cg.alpha = 0f;
+                cg.interactable = false;
+            }
+
+            // Modify the cloned screen content
+            ModifyMenuScreenContent(screenObj);
+
+            Plugin.Log.LogInfo("Mod menu screen created successfully!");
+        }
+
+        private static void ModifyMenuScreenContent(GameObject screenObj)
+        {
+            // Find and modify the title text
+            var texts = screenObj.GetComponentsInChildren<Text>(true);
+            foreach (var text in texts)
+            {
+                // Change title
+                if (text.gameObject.name.Contains("Title") || text.text.Contains("Extra"))
+                {
+                    DisableLocalization(text.gameObject);
+                    text.text = "SS Manager";
+                }
+            }
+
+            // Same for TMPro
+            var tmpTexts = screenObj.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
+            foreach (var text in tmpTexts)
+            {
+                if (text.gameObject.name.Contains("Title") || text.text.Contains("Extra"))
+                {
+                    DisableLocalization(text.gameObject);
+                    text.text = "SS Manager";
+                }
+            }
+
+            // Find existing buttons and repurpose them
+            var buttons = screenObj.GetComponentsInChildren<MenuButton>(true);
+
+            bool foundKeybindsButton = false;
+            bool foundBackButton = false;
+
+            foreach (var button in buttons)
+            {
+                if (button == _modMenuScreen.backButton)
+                {
+                    // This is the back button - configure it
+                    button.OnSubmitPressed = new UnityEvent();
+                    button.OnSubmitPressed.AddListener(OnBackButtonPressed);
+                    foundBackButton = true;
+                    continue;
+                }
+
+                if (!foundKeybindsButton)
+                {
+                    // Repurpose first non-back button as Keybinds
+                    DisableLocalization(button.gameObject);
+                    SetButtonTextDirect(button.gameObject, "Keybinds");
+                    button.OnSubmitPressed = new UnityEvent();
+                    button.OnSubmitPressed.AddListener(OnKeybindsButtonPressed);
+                    foundKeybindsButton = true;
+                    continue;
+                }
+
+                // Hide other buttons
+                button.gameObject.SetActive(false);
+            }
+
+            if (!foundBackButton && _modMenuScreen.backButton != null)
+            {
+                _modMenuScreen.backButton.OnSubmitPressed = new UnityEvent();
+                _modMenuScreen.backButton.OnSubmitPressed.AddListener(OnBackButtonPressed);
+            }
+        }
+
+        private static void DisableLocalization(GameObject obj)
+        {
+            var components = obj.GetComponentsInChildren<MonoBehaviour>(true);
+            foreach (var comp in components)
+            {
+                var typeName = comp.GetType().Name;
+                if (typeName.Contains("Locali") || typeName.Contains("Translat") || typeName.Contains("LocalisedText"))
+                {
+                    comp.enabled = false;
+                }
+            }
+        }
+
+        private static void SetButtonTextDirect(GameObject buttonObj, string text)
+        {
+            var textComp = buttonObj.GetComponentInChildren<Text>(true);
+            if (textComp != null)
+            {
+                textComp.text = text;
+            }
+
+            var tmpComp = buttonObj.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
+            if (tmpComp != null)
+            {
+                tmpComp.text = text;
+            }
+        }
+
+        private static void OnKeybindsButtonPressed()
+        {
+            Plugin.Log.LogInfo("Keybinds button pressed - not yet implemented.");
+        }
+
+        private static void OnBackButtonPressed()
+        {
+            Plugin.Log.LogInfo("Back button pressed, returning to main menu.");
+
+            var ui = UIManager.instance;
+            if (ui != null)
+            {
+                ui.StartCoroutine(ReturnToMainMenu(ui));
+            }
         }
     }
 }
