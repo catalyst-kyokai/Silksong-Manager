@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.AddressableAssets;
@@ -62,8 +63,7 @@ namespace SilksongManager.SaveState
                 // Capture PlayerData
                 state.PlayerDataJson = JsonConvert.SerializeObject(Plugin.PD);
 
-                // Capture SceneData (persistent world flags)
-                // We use JsonConvert as SceneData has [JsonObject(MemberSerialization.Fields)]
+                // Capture SceneData
                 if (SceneData.instance != null)
                 {
                     state.SceneDataJson = JsonConvert.SerializeObject(SceneData.instance);
@@ -109,20 +109,40 @@ namespace SilksongManager.SaveState
             Plugin.Log.LogInfo($"Starting robust load for state: {state.SceneName}");
             _pendingLoadState = state;
 
-            // 1. Force state cleanup
+            // 1. Force state cleanup & Pause
             Time.timeScale = 0f;
 
-            // Clean up existing coroutines if any
-            Plugin.Hero.StopAllCoroutines();
+            // Clean up existing coroutines/invulnerability
+            if (Plugin.Hero != null)
+            {
+                Plugin.Hero.StopAllCoroutines();
+                Plugin.Hero.hazardInvulnRoutine = null;
+                Plugin.Hero.CancelDamageRecoil();
+                Plugin.Hero.GetComponent<InvulnerablePulse>()?.StopInvulnerablePulse();
+            }
 
-            // 2. Load Dummy Scene ("Demo Start") to clear memory/state
+            // Close UI and Dialogs
+            EventRegister.SendEvent("INVENTORY CANCEL");
+            DialogueBox.EndConversation();
+            DialogueBox.HideInstant();
+            DialogueYesNoBox.ForceClose();
+            QuestYesNoBox.ForceClose();
+
+            // Detach from surfaces
+            SlideSurface[] surfaces = UnityEngine.Object.FindObjectsOfType<SlideSurface>();
+            foreach (var surface in surfaces)
+            {
+                if (surface.isHeroAttached) surface.Detach(false);
+            }
+
+            // 2. Load Dummy Scene ("Demo Start")
             string dummySceneName = "Demo Start";
+            GameManager.instance.entryGateName = "dreamGate";
+            GameManager.instance.startedOnThisScene = true;
 
             // Use Addressables for async loading
             var loadOp = Addressables.LoadSceneAsync("Scenes/" + dummySceneName, LoadSceneMode.Single);
             yield return loadOp;
-
-            // Wait for dummy scene
             yield return new WaitUntil(() => SceneManager.GetActiveScene().name == dummySceneName);
 
             // 3. Restore Data while in dummy scene
@@ -135,11 +155,11 @@ namespace SilksongManager.SaveState
                 JsonConvert.PopulateObject(state.SceneDataJson, SceneData.instance);
             }
 
-            // Reset transitions
+            // Reset transitions and semi-persistent items
+            GameManager.instance.ResetSemiPersistentItems();
             StaticVariableList.ClearSceneTransitions();
 
             // 4. Load Destination Scene
-            // Use GameManager transition to handle all the setup
             Plugin.GM.BeginSceneTransition(new GameManager.SceneLoadInfo
             {
                 SceneName = state.SceneName,
@@ -148,25 +168,56 @@ namespace SilksongManager.SaveState
                 EntryDelay = 0f,
                 WaitForSceneTransitionCameraFade = false,
                 Visualization = GameManager.SceneLoadVisualizations.Default,
-                PreventCameraFadeOut = true
+                PreventCameraFadeOut = true,
+                AlwaysUnloadUnusedAssets = true
             });
 
             // Wait until destination scene is active
             yield return new WaitUntil(() => SceneManager.GetActiveScene().name == state.SceneName);
 
+            // Camera Logic
+            GameManager.instance.cameraCtrl.PositionToHero(false);
+            GameManager.instance.cameraCtrl.isGameplayScene = true;
+            GameManager.instance.UpdateUIStateFromGameState();
+
+            // Fade In
+            GameManager.instance.FadeSceneIn();
+
             // 5. Post-Load Fixes
-            yield return new WaitForSeconds(0.1f); // Brief wait for objects to init
+            Plugin.Hero.CharmUpdate();
+            QuestManager.IncrementVersion();
+            CollectableItemManager.IncrementVersion();
+            PlayMakerFSM.BroadcastEvent("CHARM INDICATOR CHECK");
+            PlayMakerFSM.BroadcastEvent("TOOL EQUIPS CHANGED");
+            PlayMakerFSM.BroadcastEvent("UPDATE NAIL DAMAGE");
+
+            // Force Camera Gameplay Scene (Reflection)
+            var camField = typeof(CameraController).GetField("isGameplayScene", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (camField != null) camField.SetValue(GameManager.instance.cameraCtrl, true);
+
+            yield return null;
 
             // Apply Hero State
             ApplyStateImmediate(state);
 
+            // Handle Unpause if game was paused
+            if (GameManager.instance.isPaused)
+            {
+                GameManager.instance.FadeSceneIn();
+                GameManager.instance.isPaused = false;
+                GameCameras.instance.ResumeCameraShake();
+                Plugin.Hero.UnPause();
+                MenuButtonList.ClearAllLastSelected();
+                TimeManager.TimeScale = 1f;
+            }
+
+            // Final Physics Tap
+            yield return new WaitForFixedUpdate();
+            Plugin.Hero.transform.position = state.Position;
+
             // Time Scale back
             Time.timeScale = 1f;
             _pendingLoadState = null;
-
-            // Reset HUD and other systems
-            PlayMakerFSM.BroadcastEvent("CHARM INDICATOR CHECK");
-            PlayMakerFSM.BroadcastEvent("UPDATE NAIL DAMAGE");
 
             Plugin.Log.LogInfo("Load complete!");
         }
@@ -187,21 +238,20 @@ namespace SilksongManager.SaveState
                 if (Plugin.Hero == null) return;
                 var hero = Plugin.Hero;
 
-                // Logic handled by FindEntryPoint largely
                 hero.transform.position = state.Position;
                 hero.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
                 hero.GetComponent<Rigidbody2D>().isKinematic = false;
+                // Gravity
+                hero.AffectedByGravity(true);
+                hero.GetComponent<Rigidbody2D>().gravityScale = 0.79f; // Default gravity
 
                 // Face direction
                 if (state.FacingRight) hero.FaceRight();
                 else hero.FaceLeft();
 
                 // Explicitly invoke FinishedEnteringScene to clear flags
-                var method = typeof(HeroController).GetMethod("FinishedEnteringScene", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-                if (method != null)
-                {
-                    method.Invoke(hero, new object[] { true, false });
-                }
+                hero.FinishedEnteringScene(true, false);
+                hero.GetComponent<MeshRenderer>().enabled = true;
 
                 // Animation Force
                 hero.StartAnimationControl();
