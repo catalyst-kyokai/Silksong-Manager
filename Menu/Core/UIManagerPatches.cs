@@ -58,8 +58,8 @@ namespace SilksongManager.Menu.Core
                 // Initialize template system
                 MenuTemplates.Initialize(__instance);
 
-                // Start coroutine to wait for MainMenuOptions and add button
-                __instance.StartCoroutine(WaitAndAddSSManagerButton(__instance));
+                // SS Manager button is created by MainMenuHook, not here
+                // __instance.StartCoroutine(WaitAndAddSSManagerButton(__instance));
 
                 Plugin.Log.LogInfo("UIManager hooked successfully");
             }
