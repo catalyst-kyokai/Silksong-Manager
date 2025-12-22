@@ -176,9 +176,10 @@ namespace SilksongManager.SaveState
             yield return new WaitUntil(() => SceneManager.GetActiveScene().name == state.SceneName);
 
             // Camera Logic
+            // Camera Logic
             GameManager.instance.cameraCtrl.PositionToHero(false);
-            GameManager.instance.cameraCtrl.isGameplayScene = true;
-            GameManager.instance.UpdateUIStateFromGameState();
+            // GameManager.instance.cameraCtrl.isGameplayScene = true; // Private, handled by Reflection below
+            // GameManager.instance.UpdateUIStateFromGameState(); // Method does not exist in this version
 
             // Fade In
             GameManager.instance.FadeSceneIn();
