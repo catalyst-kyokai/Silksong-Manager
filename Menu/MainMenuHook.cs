@@ -87,6 +87,14 @@ namespace SilksongManager.Menu
                 return;
             }
 
+            // IMPORTANT: Remove EventTrigger if present - it may trigger original menu!
+            var eventTrigger = _ssManagerButton.GetComponent<UnityEngine.EventSystems.EventTrigger>();
+            if (eventTrigger != null)
+            {
+                Object.DestroyImmediate(eventTrigger);
+                Plugin.Log.LogInfo("Removed EventTrigger from cloned button");
+            }
+
             // Clear existing events and add our handler
             menuButton.OnSubmitPressed = new UnityEvent();
             menuButton.OnSubmitPressed.AddListener(OnSSManagerButtonPressed);
@@ -217,11 +225,26 @@ namespace SilksongManager.Menu
 
         private static IEnumerator GoToModMenu(UIManager ui)
         {
+            Plugin.Log.LogInfo("GoToModMenu started");
             _isInModMenu = true;
 
             // Stop UI input during transition
             var ih = GameManager.instance?.inputHandler;
             ih?.StopUIInput();
+
+            // IMPORTANT: Make sure original ExtrasMenuScreen is hidden!
+            if (ui.extrasMenuScreen != null)
+            {
+                var origCg = ui.extrasMenuScreen.GetComponent<CanvasGroup>();
+                if (origCg != null)
+                {
+                    origCg.alpha = 0f;
+                    origCg.interactable = false;
+                    origCg.blocksRaycasts = false;
+                }
+                ui.extrasMenuScreen.gameObject.SetActive(false);
+                Plugin.Log.LogInfo("Explicitly hid original ExtrasMenuScreen");
+            }
 
             // Fade out main menu like other menus do
             ui.StartCoroutine(FadeOutSprite(ui.gameTitle));
@@ -241,6 +264,7 @@ namespace SilksongManager.Menu
             yield return ui.StartCoroutine(FadeOutCanvasGroup(ui.mainMenuScreen, ui));
 
             // Show our menu screen
+            Plugin.Log.LogInfo("Showing mod menu screen");
             yield return ui.StartCoroutine(ShowMenu(_modMenuScreen, ui));
 
             // Activate our input controller
@@ -250,6 +274,7 @@ namespace SilksongManager.Menu
             }
 
             ih?.StartUIInput();
+            Plugin.Log.LogInfo("GoToModMenu completed");
         }
 
         /// <summary>
