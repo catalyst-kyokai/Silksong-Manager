@@ -116,8 +116,15 @@ namespace SilksongManager.SaveState
             if (Plugin.Hero != null)
             {
                 Plugin.Hero.StopAllCoroutines();
-                Plugin.Hero.hazardInvulnRoutine = null;
-                Plugin.Hero.CancelDamageRecoil();
+                Plugin.Hero.StopAllCoroutines();
+
+                // Reflection for private hazardInvulnRoutine
+                var hazardField = typeof(HeroController).GetField("hazardInvulnRoutine", BindingFlags.Instance | BindingFlags.NonPublic);
+                hazardField?.SetValue(Plugin.Hero, null);
+
+                // Reflection for private CancelDamageRecoil
+                var cancelRecoilMethod = typeof(HeroController).GetMethod("CancelDamageRecoil", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                cancelRecoilMethod?.Invoke(Plugin.Hero, null);
                 // Reflection for InvulnerablePulse
                 var invulnPulseComp = Plugin.Hero.GetComponent("InvulnerablePulse");
                 if (invulnPulseComp != null)
