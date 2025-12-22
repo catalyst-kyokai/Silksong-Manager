@@ -503,14 +503,24 @@ namespace SilksongManager.Menu
                 {
                     child.gameObject.SetActive(true);
 
-                    // Find and modify TMPro text inside, destroy localization
-                    var tmpTexts = child.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
-                    foreach (var tmp in tmpTexts)
+                    // Title uses UI.Text, not TMPro (based on hierarchy log)
+                    var textComponent = child.GetComponent<Text>();
+                    if (textComponent != null)
                     {
-                        DestroyLocalization(tmp.gameObject);
-                        tmp.text = "Silksong Manager";
-                        tmp.gameObject.SetActive(true);
-                        Plugin.Log.LogInfo($"Set title text to 'Silksong Manager' on {tmp.gameObject.name}");
+                        DestroyLocalization(child.gameObject);
+                        textComponent.text = "Silksong Manager";
+                        Plugin.Log.LogInfo($"Set title UI.Text to 'Silksong Manager'");
+                    }
+                    else
+                    {
+                        // Fallback to TMPro if Text not found
+                        var tmpTexts = child.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
+                        foreach (var tmp in tmpTexts)
+                        {
+                            DestroyLocalization(tmp.gameObject);
+                            tmp.text = "Silksong Manager";
+                            Plugin.Log.LogInfo($"Set title TMPro to 'Silksong Manager' on {tmp.gameObject.name}");
+                        }
                     }
 
                     Plugin.Log.LogInfo($"Enabled and modified Title: {child.name}");
@@ -528,20 +538,33 @@ namespace SilksongManager.Menu
                 }
             }
 
-            // STEP 2: Find and configure back button
+            // STEP 4: Handle back button - REPARENT it to screen root instead of enabling parents
+            // This prevents enabling Controls which contains other elements
             if (_modMenuScreen.backButton != null)
             {
-                _modMenuScreen.backButton.OnSubmitPressed = new UnityEvent();
-                _modMenuScreen.backButton.OnSubmitPressed.AddListener(OnBackButtonPressed);
-                // Make sure back button's parent is visible
-                _modMenuScreen.backButton.gameObject.SetActive(true);
-                var parent = _modMenuScreen.backButton.transform.parent;
-                while (parent != null && parent != screenObj.transform)
+                var backBtn = _modMenuScreen.backButton;
+                backBtn.OnSubmitPressed = new UnityEvent();
+                backBtn.OnSubmitPressed.AddListener(OnBackButtonPressed);
+
+                // Reparent to screen root to avoid enabling sibling elements
+                backBtn.transform.SetParent(screenObj.transform, false);
+                backBtn.gameObject.SetActive(true);
+
+                // Position at bottom of screen
+                var backRect = backBtn.GetComponent<RectTransform>();
+                if (backRect != null)
                 {
-                    parent.gameObject.SetActive(true);
-                    parent = parent.parent;
+                    backRect.anchorMin = new Vector2(0.5f, 0);
+                    backRect.anchorMax = new Vector2(0.5f, 0);
+                    backRect.pivot = new Vector2(0.5f, 0);
+                    backRect.anchoredPosition = new Vector2(0, 50);
                 }
-                Plugin.Log.LogInfo("Configured back button");
+
+                Plugin.Log.LogInfo($"Configured and reparented back button to screen root");
+            }
+            else
+            {
+                Plugin.Log.LogWarning("Back button not found in cloned MenuScreen!");
             }
 
             // STEP 4: Create Keybinds button by cloning back button
