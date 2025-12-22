@@ -87,6 +87,14 @@
       <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\PlayMaker.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Unity.Addressables">
+      <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\Unity.Addressables.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.ResourceManager">
+      <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\Unity.ResourceManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
   
   <!-- Copy to game folder after build -->
