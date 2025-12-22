@@ -102,44 +102,77 @@ namespace SilksongManager.Menu.Core
 
         private static void AddSSManagerButton(UIManager uiManager)
         {
-            var mainMenuScreen = uiManager.mainMenuScreen;
-            if (mainMenuScreen == null)
+            // Find MainMenuOptions to get proper button container
+            var mainMenuOptions = UnityEngine.Object.FindObjectOfType<MainMenuOptions>();
+            if (mainMenuOptions == null)
             {
-                Plugin.Log.LogWarning("Could not find mainMenuScreen");
+                Plugin.Log.LogWarning("Could not find MainMenuOptions - not in menu scene?");
                 return;
             }
 
-            // Find content pane in main menu
-            var contentPane = MenuTemplates.FindChild(mainMenuScreen.gameObject, "Content");
-            if (contentPane == null)
+            // Use extras button as template (like old MainMenuHook)
+            MenuButton templateButton = mainMenuOptions.extrasButton;
+            if (templateButton == null)
             {
-                // Try alternate path
-                contentPane = MenuTemplates.FindChild(mainMenuScreen.gameObject, "MenuButtons");
+                templateButton = mainMenuOptions.optionsButton;
             }
-            if (contentPane == null)
+            if (templateButton == null)
             {
-                Plugin.Log.LogWarning("Could not find Content pane in main menu screen");
+                Plugin.Log.LogError("Could not find template button to clone");
                 return;
             }
 
-            // Create SS Manager button
-            var button = MenuTemplates.CreateTextButton("SS Manager", OnSSManagerButtonPressed);
-            if (button == null)
+            // Clone the button to same parent (main menu buttons container)
+            var buttonGO = UnityEngine.Object.Instantiate(templateButton.gameObject, templateButton.transform.parent);
+            buttonGO.name = "SSManagerButton";
+
+            // Get MenuButton component
+            var menuButton = buttonGO.GetComponent<MenuButton>();
+            if (menuButton == null)
             {
-                Plugin.Log.LogError("Failed to create SS Manager button");
+                Plugin.Log.LogError("Cloned button has no MenuButton component");
+                UnityEngine.Object.Destroy(buttonGO);
                 return;
             }
 
-            // Add to content pane
-            button.transform.SetParent(contentPane.transform, false);
-            button.SetActive(true);
-
-            // Position it nicely - before Options or near end
-            // Try to find Options button index
-            int targetIndex = contentPane.transform.childCount - 2; // Before last 2 (usually Options/Quit)
-            if (targetIndex >= 0)
+            // Remove EventTrigger - may trigger original menu!
+            var eventTrigger = buttonGO.GetComponent<UnityEngine.EventSystems.EventTrigger>();
+            if (eventTrigger != null)
             {
-                button.transform.SetSiblingIndex(targetIndex);
+                UnityEngine.Object.DestroyImmediate(eventTrigger);
+            }
+
+            // Setup button click via EventTrigger
+            eventTrigger = buttonGO.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+            var entry = new UnityEngine.EventSystems.EventTrigger.Entry
+            {
+                eventID = UnityEngine.EventSystems.EventTriggerType.Submit
+            };
+            entry.callback.AddListener((data) => OnSSManagerButtonPressed());
+            eventTrigger.triggers.Add(entry);
+
+            menuButton.buttonType = MenuButton.MenuButtonType.Activate;
+
+            // Set button text
+            var textObj = buttonGO.GetComponentInChildren<Text>();
+            if (textObj != null)
+            {
+                textObj.text = "SS Manager";
+
+                // Remove localization
+                var localize = textObj.GetComponent<AutoLocalizeTextUI>();
+                if (localize != null)
+                {
+                    localize.enabled = false;
+                }
+            }
+
+            // Position before Quit (last) button
+            var quitTransform = mainMenuOptions.quitButton?.transform;
+            if (quitTransform != null)
+            {
+                int quitIndex = quitTransform.GetSiblingIndex();
+                buttonGO.transform.SetSiblingIndex(quitIndex);
             }
 
             Plugin.Log.LogInfo("SS Manager button added to main menu");
