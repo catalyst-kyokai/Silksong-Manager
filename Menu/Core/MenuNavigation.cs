@@ -105,6 +105,7 @@ namespace SilksongManager.Menu.Core
         private static IEnumerator GoBackCoroutine(int count)
         {
             _isTransitioning = true;
+            Plugin.Log.LogInfo($"MenuNavigation.GoBack: count={count}, historyCount={_history.Count}, wasOnMainMenu={_wasOnMainMenu}");
 
             var ui = UIManager.instance;
             CustomMenuScreen currentScreen = _history.Count > 0 ? _history.Peek() : null;
@@ -114,6 +115,7 @@ namespace SilksongManager.Menu.Core
                 // Hide current screen
                 if (currentScreen != null)
                 {
+                    Plugin.Log.LogInfo($"MenuNavigation: Hiding screen '{currentScreen.Title}'");
                     currentScreen.InvokeOnHide(NavigationType.Backwards);
                     yield return ui.StartCoroutine(ui.HideMenu(currentScreen.MenuScreen));
                 }
@@ -121,26 +123,28 @@ namespace SilksongManager.Menu.Core
                 // Pop screens from history
                 for (int i = 0; i < count && _history.Count > 0; i++)
                 {
-                    _history.Pop();
+                    var popped = _history.Pop();
+                    Plugin.Log.LogInfo($"MenuNavigation: Popped '{popped.Title}' from history, remaining={_history.Count}");
                 }
 
                 // Show previous screen or base game menu
                 if (_history.Count > 0)
                 {
                     var prevScreen = _history.Peek();
+                    Plugin.Log.LogInfo($"MenuNavigation: Showing previous screen '{prevScreen.Title}'");
                     prevScreen.InvokeOnShow(NavigationType.Backwards);
                     yield return ui.StartCoroutine(ui.ShowMenu(prevScreen.MenuScreen));
                 }
                 else if (_wasOnMainMenu)
                 {
-                    // Restore main menu (CanvasGroup)
+                    Plugin.Log.LogInfo("MenuNavigation: Restoring main menu (CanvasGroup)");
                     yield return ui.StartCoroutine(ShowMainMenu(ui));
                     ui.menuState = _baseMenuState;
                     _wasOnMainMenu = false;
+                    Plugin.Log.LogInfo("MenuNavigation: Main menu restored");
                 }
                 else
                 {
-                    // Fallback to options menu
                     Plugin.Log.LogWarning("MenuNavigation: No base state, returning to options");
                     yield return ui.StartCoroutine(ui.ShowMenu(ui.optionsMenuScreen));
                     ui.menuState = MainMenuState.OPTIONS_MENU;

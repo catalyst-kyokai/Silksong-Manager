@@ -227,7 +227,7 @@ namespace SilksongManager
             {
                 // Reset menu hook when leaving menu scene
                 _menuHookInitialized = false;
-                Menu.MainMenuHook.Reset();
+                // Menu.MainMenuHook.Reset(); // OLD SYSTEM - disabled, using new UIManagerPatches
             }
         }
 
@@ -246,11 +246,12 @@ namespace SilksongManager
                 {
                     Log.LogInfo($"MainMenuOptions found after {elapsed:F2}s");
 
-                    if (!_menuHookInitialized)
-                    {
-                        Menu.MainMenuHook.Initialize();
-                        _menuHookInitialized = true;
-                    }
+                    // OLD SYSTEM - disabled, using new UIManagerPatches
+                    // if (!_menuHookInitialized)
+                    // {
+                    //     Menu.MainMenuHook.Initialize();
+                    //     _menuHookInitialized = true;
+                    // }
                     yield break;
                 }
 

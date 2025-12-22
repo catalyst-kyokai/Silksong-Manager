@@ -16,24 +16,29 @@ namespace SilksongManager.Menu.Screens
 
         protected override void BuildContent()
         {
+            Plugin.Log.LogInfo($"SSManagerScreen.BuildContent: ContentPane is {(ContentPane != null ? "valid" : "NULL")}");
+
             // Settings button - opens SettingsScreen with sliders/toggles
-            AddButton("Settings", () =>
+            var settingsBtn = AddButton("Settings", () =>
             {
                 MenuNavigation.Show(new SettingsScreen());
             });
+            Plugin.Log.LogInfo($"SSManagerScreen: Settings button {(settingsBtn != null ? "created" : "FAILED")}");
 
             // Keybinds button
-            AddButton("Keybinds", () =>
+            var keybindsBtn = AddButton("Keybinds", () =>
             {
                 MenuNavigation.Show(new KeybindsMenuScreen());
             });
+            Plugin.Log.LogInfo($"SSManagerScreen: Keybinds button {(keybindsBtn != null ? "created" : "FAILED")}");
 
             // Debug Menu info button
-            AddButton("Debug Menu", () =>
+            var debugBtn = AddButton("Debug Menu", () =>
             {
                 var key = ModKeybindManager.GetKeybind(ModAction.ToggleDebugMenu);
                 Plugin.Log.LogInfo($"Debug Menu is toggled via {key} key");
             });
+            Plugin.Log.LogInfo($"SSManagerScreen: Debug Menu button {(debugBtn != null ? "created" : "FAILED")}");
         }
 
         protected override void OnScreenShow(NavigationType navType)
