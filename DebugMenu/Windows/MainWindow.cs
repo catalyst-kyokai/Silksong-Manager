@@ -15,15 +15,10 @@ namespace SilksongManager.DebugMenu.Windows
 
         private DebugMenuController _controller;
 
-        public MainWindow(DebugMenuController controller)
+        public MainWindow(DebugMenuController controller) : base()
         {
             _controller = controller;
-
-            // Load saved position
-            var savedPos = DebugMenuConfig.MainWindowPosition;
-            WindowRect = new Rect(savedPos.x, savedPos.y, DefaultSize.x, DefaultSize.y);
-
-            IsVisible = false;
+            // Base constructor calls LoadState() which loads position/size/visibility from config
         }
 
         protected override void DrawContent()
