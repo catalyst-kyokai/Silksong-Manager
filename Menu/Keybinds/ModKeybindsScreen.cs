@@ -646,6 +646,20 @@ namespace SilksongManager.Menu.Keybinds
         {
             if (!ModKeybindsScreen.IsActive) return;
 
+            // Failsafe: Ensure main menu stays hidden
+            // If the game triggers main menu visibility (e.g. via state reset), we squash it immediately
+            var ui = UIManager.instance;
+            if (ui != null && ui.mainMenuScreen != null && ui.mainMenuScreen.gameObject.activeSelf)
+            {
+                ui.mainMenuScreen.gameObject.SetActive(false);
+
+                // Also hide title/subtitle if they appeared
+                if (ui.gameTitle != null && ui.gameTitle.color.a > 0.1f)
+                {
+                    ui.gameTitle.color = new Color(ui.gameTitle.color.r, ui.gameTitle.color.g, ui.gameTitle.color.b, 0f);
+                }
+            }
+
             // Check for Escape key
             if (Input.GetKeyDown(KeyCode.Escape))
             {

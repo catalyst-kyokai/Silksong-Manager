@@ -774,7 +774,12 @@ namespace SilksongManager.Menu
             // Deactivate ModMenuController so Escape doesn't trigger HandleBackPressed
             if (_menuController != null)
             {
+                Plugin.Log.LogInfo("Deactivating ModMenuController in GoToKeybindsScreen");
                 _menuController.SetActive(false);
+            }
+            else
+            {
+                Plugin.Log.LogError("_menuController is NULL in GoToKeybindsScreen!");
             }
 
             // Hide mod menu
