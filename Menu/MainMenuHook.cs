@@ -38,6 +38,7 @@ namespace SilksongManager.Menu
 
                 CreateModMenuScreen();
                 CreateSSManagerButton(mainMenuOptions);
+                AddCustomCredits();
 
                 _initialized = true;
                 Plugin.Log.LogInfo("Main menu hook initialized successfully!");
@@ -488,6 +489,60 @@ namespace SilksongManager.Menu
         }
 
         #endregion
+
+        private static void AddCustomCredits()
+        {
+            var texts = Object.FindObjectsOfType<Text>();
+            foreach (var text in texts)
+            {
+                // Version string typically looks like "1.0.xxxxx"
+                if (text.text.Contains("1.0.") && text.text.Length < 20)
+                {
+                    Plugin.Log.LogInfo($"Found version text: {text.text}");
+
+                    var creditsObj = Object.Instantiate(text.gameObject, text.transform.parent);
+                    creditsObj.name = "SSManagerCredits";
+
+                    // Remove any existing localization/other scripts that might interfere
+                    foreach (var comp in creditsObj.GetComponents<MonoBehaviour>())
+                    {
+                        if (comp is not Text)
+                        {
+                            Object.Destroy(comp);
+                        }
+                    }
+
+                    var creditsText = creditsObj.GetComponent<Text>();
+                    creditsText.text = "Silksong Manager Edition\n<size=16>with <color=#ff6060>❤</color> by Catalyst</size>";
+                    creditsText.lineSpacing = 0.8f;
+
+                    // Allow Rich Text
+                    creditsText.supportRichText = true;
+
+                    // Check for Layout Group
+                    var layoutGroup = text.transform.parent.GetComponent<VerticalLayoutGroup>();
+                    if (layoutGroup != null)
+                    {
+                        creditsObj.transform.SetSiblingIndex(text.transform.GetSiblingIndex() + 1);
+                        Plugin.Log.LogInfo("Added credits via LayoutGroup");
+                    }
+                    else
+                    {
+                        // Manual positioning
+                        var rect = creditsObj.GetComponent<RectTransform>();
+                        var originalRect = text.GetComponent<RectTransform>();
+
+                        // Shift down by approx 45 units
+                        rect.anchoredPosition = originalRect.anchoredPosition - new Vector2(0, 45);
+
+                        Plugin.Log.LogInfo("Added credits via manual positioning");
+                    }
+
+                    return;
+                }
+            }
+            Plugin.Log.LogInfo("Could not find version text to attach credits to.");
+        }
 
         private static void CreateModMenuScreen()
         {
