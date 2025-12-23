@@ -533,12 +533,19 @@ namespace SilksongManager.SaveState
             var data = new BattleSceneStateData();
             data.GameObjectPath = GetGameObjectPath(battleScene.gameObject);
 
-            // currentWave is public in BattleScene
+            // Public fields
             data.CurrentWave = battleScene.currentWave;
-            // currentEnemies and enemiesToNext are private, use reflection
-            var type = typeof(BattleScene);
-            data.CurrentEnemies = (int)(type.GetField("currentEnemies", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(battleScene) ?? 0);
-            data.EnemiesToNext = (int)(type.GetField("enemiesToNext", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(battleScene) ?? 0);
+            data.CurrentEnemies = battleScene.currentEnemies;
+            data.EnemiesToNext = battleScene.enemiesToNext;
+
+            // Private 'started' field - use reflection
+            var startedField = typeof(BattleScene).GetField("started", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (startedField != null)
+            {
+                data.Started = (bool)(startedField.GetValue(battleScene) ?? false);
+            }
+
+            Plugin.Log.LogInfo($"[DEBUG] Captured BattleScene: wave={data.CurrentWave}, enemies={data.CurrentEnemies}, started={data.Started}");
 
             return data;
         }
@@ -774,12 +781,35 @@ namespace SilksongManager.SaveState
             var battleScene = UnityEngine.Object.FindObjectOfType<BattleScene>();
             if (battleScene == null) return;
 
-            // currentWave is public
-            battleScene.currentWave = data.CurrentWave;
-            // currentEnemies and enemiesToNext are private - use reflection if needed
             var type = typeof(BattleScene);
-            type.GetField("currentEnemies", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(battleScene, data.CurrentEnemies);
-            type.GetField("enemiesToNext", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(battleScene, data.EnemiesToNext);
+
+            // Restore battle state
+            battleScene.currentWave = data.CurrentWave;
+            battleScene.currentEnemies = data.CurrentEnemies;
+            battleScene.enemiesToNext = data.EnemiesToNext;
+
+            // Set started=true if CurrentWave > 0 (battle has started)
+            if (data.Started || data.CurrentWave > 0)
+            {
+                var startedField = type.GetField("started", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (startedField != null)
+                {
+                    startedField.SetValue(battleScene, true);
+                    Plugin.Log.LogInfo("[DEBUG] Set BattleScene.started = true");
+                }
+
+                // Disable the collider (battle already triggered)
+                var boxCollider = battleScene.GetComponent<BoxCollider2D>();
+                if (boxCollider != null) boxCollider.enabled = false;
+
+                var polyCollider = battleScene.GetComponent<PolygonCollider2D>();
+                if (polyCollider != null) polyCollider.enabled = false;
+
+                // IMPORTANT: Call LockInBattle() to close arena gates
+                // This sends "BG CLOSE" event to gate FSMs and activates camera locks
+                battleScene.LockInBattle();
+                Plugin.Log.LogInfo("[DEBUG] Called BattleScene.LockInBattle() to close gates");
+            }
         }
 
         private static void RestoreBossSceneState(BossSceneStateData data)
