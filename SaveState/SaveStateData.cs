@@ -26,6 +26,13 @@ namespace SilksongManager.SaveState
         public int MaxSilk;
         public int Geo;
 
+        // Enemy states
+        public System.Collections.Generic.List<EnemyStateData> EnemyStates;
+
+        // Battle context
+        public BattleSceneStateData BattleSceneState;
+        public BossSceneStateData BossSceneState;
+
         // Metadata
         public string GetDisplayName()
         {
