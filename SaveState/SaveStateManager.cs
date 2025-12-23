@@ -500,10 +500,13 @@ namespace SilksongManager.SaveState
                     data.FsmStates.Add(CaptureFsmState(fsm));
                 }
 
-                // Capture child object active states (for cocoons, effects, etc.)
+                // Capture detailed component state for main object
+                data.MainObjectState = CaptureObjectComponentData(enemy.gameObject);
+
+                // Capture detailed component state for all children
                 foreach (Transform child in enemy.transform)
                 {
-                    data.ChildObjectStates[child.name] = child.gameObject.activeSelf;
+                    data.ChildStates[child.name] = CaptureObjectComponentData(child.gameObject);
                 }
 
                 enemyStates.Add(data);
@@ -636,8 +639,26 @@ namespace SilksongManager.SaveState
                     }
                 }
 
-                // Restore child object active states (for cocoons, effects, etc.)
-                if (state.ChildObjectStates != null && state.ChildObjectStates.Count > 0)
+                // Restore detailed component state for main object
+                if (state.MainObjectState != null)
+                {
+                    RestoreObjectComponentData(enemy.gameObject, state.MainObjectState);
+                }
+
+                // Restore child object active states and components
+                if (state.ChildStates != null && state.ChildStates.Count > 0)
+                {
+                    foreach (Transform child in enemy.transform)
+                    {
+                        if (state.ChildStates.TryGetValue(child.name, out ObjectComponentData childData))
+                        {
+                            RestoreObjectComponentData(child.gameObject, childData);
+                        }
+                    }
+                    Plugin.Log.LogInfo($"[DEBUG] Restored full state for {state.ChildStates.Count} child objects on {state.GameObjectName}");
+                }
+                // Fallback for old saves or mixed data
+                else if (state.ChildObjectStates != null && state.ChildObjectStates.Count > 0)
                 {
                     foreach (Transform child in enemy.transform)
                     {
@@ -646,7 +667,7 @@ namespace SilksongManager.SaveState
                             child.gameObject.SetActive(isActive);
                         }
                     }
-                    Plugin.Log.LogInfo($"[DEBUG] Restored active state for {state.ChildObjectStates.Count} child objects on {state.GameObjectName}");
+                    Plugin.Log.LogInfo($"[DEBUG] Restored (legacy) active state for {state.ChildObjectStates.Count} child objects on {state.GameObjectName}");
                 }
 
                 if (state.IsDead)
@@ -913,6 +934,103 @@ namespace SilksongManager.SaveState
             bossCtrl.BossLevel = data.BossLevel;
             // HasTransitionedIn doesn't have a public setter, would need reflection if needed
             // For now, skip setting HasTransitionedIn as it's typically set by scene logic
+        }
+
+        private static void RestoreObjectComponentData(GameObject obj, ObjectComponentData data)
+        {
+            if (data == null) return;
+
+            obj.SetActive(data.IsActive);
+
+            if (data.SpriteRenderer != null)
+            {
+                var sr = obj.GetComponent<SpriteRenderer>();
+                if (sr != null)
+                {
+                    sr.enabled = data.SpriteRenderer.Enabled;
+                    sr.color = data.SpriteRenderer.Color;
+                    sr.sortingOrder = data.SpriteRenderer.SortingOrder;
+                    sr.sortingLayerName = data.SpriteRenderer.SortingLayerName;
+                }
+            }
+
+            if (data.Animator != null)
+            {
+                var anim = obj.GetComponent<Animator>();
+                if (anim != null)
+                {
+                    anim.enabled = data.Animator.Enabled;
+                    if (data.Animator.Enabled)
+                    {
+                        anim.Play(data.Animator.StateHash, 0, data.Animator.NormalizedTime);
+                        anim.speed = data.Animator.Speed;
+                    }
+                }
+            }
+
+            if (data.Collider2D != null)
+            {
+                var col = obj.GetComponent<Collider2D>();
+                if (col != null)
+                {
+                    col.enabled = data.Collider2D.Enabled;
+                    col.isTrigger = data.Collider2D.IsTrigger;
+                }
+            }
+        }
+
+        private static ObjectComponentData CaptureObjectComponentData(GameObject obj)
+        {
+            var data = new ObjectComponentData();
+            data.IsActive = obj.activeSelf;
+
+            var sr = obj.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                data.SpriteRenderer = new SpriteRendererData
+                {
+                    Enabled = sr.enabled,
+                    Color = sr.color,
+                    SortingOrder = sr.sortingOrder,
+                    SortingLayerName = sr.sortingLayerName,
+                    SpriteName = sr.sprite != null ? sr.sprite.name : "null"
+                };
+            }
+
+            var anim = obj.GetComponent<Animator>();
+            if (anim != null && anim.runtimeAnimatorController != null)
+            {
+                var stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+                data.Animator = new AnimatorData
+                {
+                    Enabled = anim.enabled,
+                    StateHash = stateInfo.shortNameHash,
+                    NormalizedTime = stateInfo.normalizedTime,
+                    Speed = anim.speed
+                };
+            }
+
+            var col = obj.GetComponent<Collider2D>();
+            if (col != null)
+            {
+                data.Collider2D = new ColliderData
+                {
+                    Enabled = col.enabled,
+                    IsTrigger = col.isTrigger
+                };
+            }
+
+            // Detailed logging as requested
+            // if (obj.activeSelf) // Log everything for now to be safe
+            {
+                string log = $"[DEBUG] Captured '{obj.name}': active={data.IsActive}";
+                if (data.SpriteRenderer != null) log += $", SR[en={data.SpriteRenderer.Enabled}, sort={data.SpriteRenderer.SortingOrder}, sprite={data.SpriteRenderer.SpriteName}]";
+                if (data.Animator != null) log += $", Anim[en={data.Animator.Enabled}, hash={data.Animator.StateHash}]";
+                if (data.Collider2D != null) log += $", Col[en={data.Collider2D.Enabled}]";
+                Plugin.Log.LogInfo(log);
+            }
+
+            return data;
         }
 
         private static string GetGameObjectPath(GameObject obj)
