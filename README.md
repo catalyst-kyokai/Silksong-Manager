@@ -40,12 +40,25 @@
 
 ## 🚀 Installation
 
+
 1. **Install BepInEx**: Ensure you have BepInEx 5.x installed in your *Hollow Knight: Silksong* directory.
-2. **Download**: Get the latest `SilksongManager.dll` release.
-3. **Install Mod**: Drop the `.dll` file into:
-   `...\Hollow Knight Silksong\BepInEx\plugins\SilksongManager\`
-   *(Create the folder if it doesn't exist)*
+2. **Download**:
+   - Go to the [Releases Setup](https://github.com/catalyst-kyokai/Silksong-Manager/releases) page.
+   - Download the latest `SilksongManager.zip` (recommended) or `SilksongManager.dll`.
+3. **Install Mod**:
+   - **Method A (Archive):** Extract the contents of `SilksongManager.zip` directly into your game's root folder.
+   - **Method B (Manual):** Place `SilksongManager.dll` into:
+     `...\Hollow Knight Silksong\BepInEx\plugins\SilksongManager\`
 4. **Launch**: Start the game. The mod is active!
+
+### 🛡️ Verify Integrity (Optional)
+To ensure your download is genuine and uncorrupted, compare the SHA256 hash of your file with the one provided in the Release notes.
+
+**Powershell:**
+```powershell
+Get-FileHash SilksongManager.dll -Algorithm SHA256
+```
+
 
 ---
 
