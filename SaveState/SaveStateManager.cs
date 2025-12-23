@@ -67,6 +67,7 @@ namespace SilksongManager.SaveState
                 if (SceneData.instance != null)
                 {
                     state.SceneDataJson = JsonConvert.SerializeObject(SceneData.instance);
+                    Plugin.Log.LogInfo($"[DEBUG] Captured SceneData, JSON length: {state.SceneDataJson?.Length ?? 0}");
                 }
 
                 // Capture Hero State
@@ -179,7 +180,13 @@ namespace SilksongManager.SaveState
             }
             if (SceneData.instance != null && !string.IsNullOrEmpty(state.SceneDataJson))
             {
+                Plugin.Log.LogInfo($"[DEBUG] Restoring SceneData, JSON length: {state.SceneDataJson.Length}");
                 JsonConvert.PopulateObject(state.SceneDataJson, SceneData.instance);
+                Plugin.Log.LogInfo($"[DEBUG] SceneData restored");
+            }
+            else
+            {
+                Plugin.Log.LogWarning($"[DEBUG] SceneData NOT restored: instance={SceneData.instance != null}, json={!string.IsNullOrEmpty(state.SceneDataJson)}");
             }
 
             // Reset transitions only (NOT semi-persistent items - we want to keep our restored data)
@@ -636,13 +643,32 @@ namespace SilksongManager.SaveState
 
             var persistentItems = UnityEngine.Object.FindObjectsOfType<PersistentBoolItem>();
             int restoredCount = 0;
+            int trueCount = 0;
+
+            Plugin.Log.LogInfo($"[DEBUG] Found {persistentItems.Length} PersistentBoolItems to process");
 
             foreach (var item in persistentItems)
             {
                 try
                 {
+                    // Check value before PreSetup
+                    bool hadValueBefore = item.HasLoadedValue;
+                    bool valueBefore = item.HasLoadedValue ? item.LoadedValue : false;
+
                     // PreSetup() calls Start() which re-reads from SceneData and triggers OnSetSaveState
                     item.PreSetup();
+
+                    // Check value after PreSetup
+                    bool hasValueAfter = item.HasLoadedValue;
+                    bool valueAfter = item.HasLoadedValue ? item.LoadedValue : false;
+
+                    if (valueAfter) trueCount++;
+
+                    if (hadValueBefore != hasValueAfter || valueBefore != valueAfter)
+                    {
+                        Plugin.Log.LogInfo($"[DEBUG] PersistentBoolItem '{item.name}' changed: {valueBefore} -> {valueAfter}");
+                    }
+
                     restoredCount++;
                 }
                 catch (Exception e)
@@ -651,7 +677,7 @@ namespace SilksongManager.SaveState
                 }
             }
 
-            Plugin.Log.LogInfo($"Restored {restoredCount} PersistentBoolItems");
+            Plugin.Log.LogInfo($"[DEBUG] Restored {restoredCount} PersistentBoolItems, {trueCount} had true value");
         }
 
         private static void RestoreBattleSceneState(BattleSceneStateData data)
