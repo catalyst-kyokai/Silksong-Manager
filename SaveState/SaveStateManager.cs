@@ -503,10 +503,14 @@ namespace SilksongManager.SaveState
                 // Capture detailed component state for main object
                 data.MainObjectState = CaptureObjectComponentData(enemy.gameObject);
 
-                // Capture detailed component state for all children
-                foreach (Transform child in enemy.transform)
+                // Capture detailed component state for all descendants (recursive)
+                var allChildren = enemy.GetComponentsInChildren<Transform>(true);
+                foreach (Transform child in allChildren)
                 {
-                    data.ChildStates[child.name] = CaptureObjectComponentData(child.gameObject);
+                    if (child == enemy.transform) continue; // Skip root as it's already captured
+
+                    string relativePath = GetRelativePath(child, enemy.transform);
+                    data.ChildStates[relativePath] = CaptureObjectComponentData(child.gameObject);
                 }
 
                 enemyStates.Add(data);
@@ -645,19 +649,26 @@ namespace SilksongManager.SaveState
                     RestoreObjectComponentData(enemy.gameObject, state.MainObjectState);
                 }
 
-                // Restore child object active states and components
+                // Restore child object active states and components (recursive by path)
                 if (state.ChildStates != null && state.ChildStates.Count > 0)
                 {
-                    foreach (Transform child in enemy.transform)
+                    foreach (var kvp in state.ChildStates)
                     {
-                        if (state.ChildStates.TryGetValue(child.name, out ObjectComponentData childData))
+                        string relativePath = kvp.Key;
+                        Transform childTransform = enemy.transform.Find(relativePath); // Find supports "Path/To/Child"
+
+                        if (childTransform != null)
                         {
-                            RestoreObjectComponentData(child.gameObject, childData);
+                            RestoreObjectComponentData(childTransform.gameObject, kvp.Value);
+                        }
+                        else
+                        {
+                            Plugin.Log.LogError($"[ERROR] Could not find child '{relativePath}' on '{state.GameObjectName}' to restore state.");
                         }
                     }
                     Plugin.Log.LogInfo($"[DEBUG] Restored full state for {state.ChildStates.Count} child objects on {state.GameObjectName}");
                 }
-                // Fallback for old saves or mixed data
+                // Fallback for old saves or mixed data (Legacy)
                 else if (state.ChildObjectStates != null && state.ChildObjectStates.Count > 0)
                 {
                     foreach (Transform child in enemy.transform)
@@ -1031,6 +1042,19 @@ namespace SilksongManager.SaveState
             }
 
             return data;
+        }
+
+        private static string GetRelativePath(Transform child, Transform root)
+        {
+            if (child == root) return "";
+            string path = child.name;
+            Transform parent = child.parent;
+            while (parent != null && parent != root)
+            {
+                path = parent.name + "/" + path;
+                parent = parent.parent;
+            }
+            return path;
         }
 
         private static string GetGameObjectPath(GameObject obj)
