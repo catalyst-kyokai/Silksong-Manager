@@ -639,19 +639,27 @@ namespace SilksongManager.SaveState
 
         private static void RestoreFsmState(PlayMakerFSM fsm, FsmStateData data)
         {
+            Plugin.Log.LogInfo($"[DEBUG] RestoreFsmState: {fsm.gameObject.name}/{fsm.FsmName} -> target state '{data.ActiveStateName}'");
+
             if (fsm.FsmVariables != null)
             {
-                foreach (var kvp in data.BoolVariables) fsm.FsmVariables.GetFsmBool(kvp.Key).Value = kvp.Value;
-                foreach (var kvp in data.IntVariables) fsm.FsmVariables.GetFsmInt(kvp.Key).Value = kvp.Value;
-                foreach (var kvp in data.FloatVariables) fsm.FsmVariables.GetFsmFloat(kvp.Key).Value = kvp.Value;
-                foreach (var kvp in data.StringVariables) fsm.FsmVariables.GetFsmString(kvp.Key).Value = kvp.Value;
-                foreach (var kvp in data.Vector3Variables) fsm.FsmVariables.GetFsmVector3(kvp.Key).Value = kvp.Value;
+                int varCount = 0;
+                foreach (var kvp in data.BoolVariables) { fsm.FsmVariables.GetFsmBool(kvp.Key).Value = kvp.Value; varCount++; }
+                foreach (var kvp in data.IntVariables) { fsm.FsmVariables.GetFsmInt(kvp.Key).Value = kvp.Value; varCount++; }
+                foreach (var kvp in data.FloatVariables) { fsm.FsmVariables.GetFsmFloat(kvp.Key).Value = kvp.Value; varCount++; }
+                foreach (var kvp in data.StringVariables) { fsm.FsmVariables.GetFsmString(kvp.Key).Value = kvp.Value; varCount++; }
+                foreach (var kvp in data.Vector3Variables) { fsm.FsmVariables.GetFsmVector3(kvp.Key).Value = kvp.Value; varCount++; }
+                Plugin.Log.LogInfo($"[DEBUG] Restored {varCount} FSM variables");
             }
 
             if (!string.IsNullOrEmpty(data.ActiveStateName))
             {
                 try
                 {
+                    // Check current state before changing
+                    string currentState = fsm.ActiveStateName;
+                    Plugin.Log.LogInfo($"[DEBUG] FSM current state: '{currentState}', target: '{data.ActiveStateName}'");
+
                     // Check if this is an intro/wait state that should be fast-forwarded
                     string lowerState = data.ActiveStateName.ToLower();
                     bool isIntroState = lowerState.Contains("init") || lowerState.Contains("wait") ||
@@ -665,11 +673,23 @@ namespace SilksongManager.SaveState
                         fsm.SendEvent("END");
                         fsm.SendEvent("WAKE");
                         fsm.SendEvent("HATCH");
-                        Plugin.Log.LogInfo($"Skipped intro state '{data.ActiveStateName}' on {fsm.FsmName}");
+                        Plugin.Log.LogInfo($"[DEBUG] Skipped intro state '{data.ActiveStateName}' on {fsm.FsmName} by sending events");
                     }
                     else
                     {
+                        // For boss fight states like "Swoop", we need to:
+                        // 1. Set the FSM state
+                        // 2. For boss monsters, also trigger visual updates
                         fsm.Fsm.SetState(data.ActiveStateName);
+                        Plugin.Log.LogInfo($"[DEBUG] Set FSM state to '{data.ActiveStateName}', new active: '{fsm.ActiveStateName}'");
+
+                        // If this is a boss Control FSM and the state is an action state, send events to wake it up
+                        if (fsm.FsmName == "Control")
+                        {
+                            // Send events that might help the boss "wake up" visually
+                            fsm.SendEvent("FINISHED"); // Complete any wait states
+                            Plugin.Log.LogInfo($"[DEBUG] Sent FINISHED event to {fsm.FsmName}");
+                        }
                     }
                 }
                 catch (Exception e)
