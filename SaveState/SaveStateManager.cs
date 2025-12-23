@@ -660,36 +660,68 @@ namespace SilksongManager.SaveState
                     string currentState = fsm.ActiveStateName;
                     Plugin.Log.LogInfo($"[DEBUG] FSM current state: '{currentState}', target: '{data.ActiveStateName}'");
 
-                    // Check if this is an intro/wait state that should be fast-forwarded
-                    string lowerState = data.ActiveStateName.ToLower();
-                    bool isIntroState = lowerState.Contains("init") || lowerState.Contains("wait") ||
-                                       lowerState.Contains("pause") || lowerState.Contains("intro") ||
-                                       lowerState.Contains("sleep") || lowerState.Contains("cocoon");
-
-                    if (isIntroState)
+                    // For "Control" FSMs (boss behavior), we need special handling
+                    if (fsm.FsmName == "Control")
                     {
-                        // Send events to skip intro sequences
-                        fsm.SendEvent("FINISHED");
-                        fsm.SendEvent("END");
-                        fsm.SendEvent("WAKE");
-                        fsm.SendEvent("HATCH");
-                        Plugin.Log.LogInfo($"[DEBUG] Skipped intro state '{data.ActiveStateName}' on {fsm.FsmName} by sending events");
-                    }
-                    else
-                    {
-                        // For boss fight states like "Swoop", we need to:
-                        // 1. Set the FSM state
-                        // 2. For boss monsters, also trigger visual updates
+                        // Set the state first
                         fsm.Fsm.SetState(data.ActiveStateName);
                         Plugin.Log.LogInfo($"[DEBUG] Set FSM state to '{data.ActiveStateName}', new active: '{fsm.ActiveStateName}'");
 
-                        // If this is a boss Control FSM and the state is an action state, send events to wake it up
-                        if (fsm.FsmName == "Control")
+                        // Try to restart the FSM to force it to properly enter the current state
+                        // This forces PlayMaker to run the entry actions
+                        try
                         {
-                            // Send events that might help the boss "wake up" visually
-                            fsm.SendEvent("FINISHED"); // Complete any wait states
-                            Plugin.Log.LogInfo($"[DEBUG] Sent FINISHED event to {fsm.FsmName}");
+                            // Use reflection to call Fsm.Start() which re-initializes and enters current state
+                            var fsmType = fsm.Fsm.GetType();
+
+                            // Try to call EnterState to properly enter with actions
+                            var activeStateField = fsmType.GetField("ActiveState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                            if (activeStateField != null)
+                            {
+                                var activeState = activeStateField.GetValue(fsm.Fsm);
+                                if (activeState != null)
+                                {
+                                    // Try to call OnEnter actions manually via reflection
+                                    var stateType = activeState.GetType();
+                                    var actionsField = stateType.GetField("Actions", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                                    if (actionsField != null)
+                                    {
+                                        var actions = actionsField.GetValue(activeState) as Array;
+                                        if (actions != null)
+                                        {
+                                            foreach (var action in actions)
+                                            {
+                                                if (action != null)
+                                                {
+                                                    var onEnter = action.GetType().GetMethod("OnEnter", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                                                    onEnter?.Invoke(action, null);
+                                                }
+                                            }
+                                            Plugin.Log.LogInfo($"[DEBUG] Triggered OnEnter for {actions.Length} actions in state '{data.ActiveStateName}'");
+                                        }
+                                    }
+                                }
+                            }
                         }
+                        catch (Exception e)
+                        {
+                            Plugin.Log.LogWarning($"[DEBUG] Could not run state entry actions: {e.Message}");
+                        }
+
+                        // Also sync the Animator if present
+                        var animator = fsm.gameObject.GetComponent<Animator>();
+                        if (animator != null)
+                        {
+                            // Try to set animator to appropriate state based on FSM state
+                            animator.Play(data.ActiveStateName, -1, 0f);
+                            Plugin.Log.LogInfo($"[DEBUG] Triggered Animator.Play('{data.ActiveStateName}')");
+                        }
+                    }
+                    else
+                    {
+                        // For non-Control FSMs, just set the state
+                        fsm.Fsm.SetState(data.ActiveStateName);
+                        Plugin.Log.LogInfo($"[DEBUG] Set FSM state to '{data.ActiveStateName}', new active: '{fsm.ActiveStateName}'");
                     }
                 }
                 catch (Exception e)
