@@ -225,6 +225,12 @@ namespace SilksongManager.SaveState
 
             yield return null;
 
+            // Restore Persistent Bool Items (breakables, etc.)
+            try { RestorePersistentBoolItems(); } catch (Exception e) { Plugin.Log.LogError("Error restoring persistent items: " + e); }
+
+            // Small delay to let FSMs initialize before applying enemy states
+            yield return new WaitForSeconds(0.2f);
+
             // Restore Enemy & Scene States
             try { RestoreEnemyStates(state.EnemyStates); } catch (Exception e) { Plugin.Log.LogError("Error restoring enemies: " + e); }
             try { RestoreBattleSceneState(state.BattleSceneState); } catch (Exception e) { Plugin.Log.LogError("Error restoring battle: " + e); }
@@ -589,11 +595,88 @@ namespace SilksongManager.SaveState
             {
                 try
                 {
-                    fsm.Fsm.SetState(data.ActiveStateName);
+                    // Check if this is an intro/wait state that should be fast-forwarded
+                    string lowerState = data.ActiveStateName.ToLower();
+                    bool isIntroState = lowerState.Contains("init") || lowerState.Contains("wait") ||
+                                       lowerState.Contains("pause") || lowerState.Contains("intro") ||
+                                       lowerState.Contains("sleep") || lowerState.Contains("cocoon");
+
+                    if (isIntroState)
+                    {
+                        // Send events to skip intro sequences
+                        fsm.SendEvent("FINISHED");
+                        fsm.SendEvent("END");
+                        fsm.SendEvent("WAKE");
+                        fsm.SendEvent("HATCH");
+                        Plugin.Log.LogInfo($"Skipped intro state '{data.ActiveStateName}' on {fsm.FsmName}");
+                    }
+                    else
+                    {
+                        fsm.Fsm.SetState(data.ActiveStateName);
+                    }
                 }
                 catch (Exception e)
                 {
                     Plugin.Log.LogError($"Failed to set FSM state {data.ActiveStateName} on {fsm.name}: {e.Message}");
+                }
+            }
+        }
+
+        private static void RestorePersistentBoolItems()
+        {
+            // Re-trigger PersistentBoolItem evaluation from SceneData
+            var persistentItems = UnityEngine.Object.FindObjectsOfType<PersistentBoolItem>();
+            foreach (var item in persistentItems)
+            {
+                try
+                {
+                    // PersistentBoolItem reads from SceneData in Awake
+                    // We can force re-read by calling SetValueOverride with current SceneData value
+                    // This triggers the OnSetSaveState event which handles disabling broken objects
+
+                    // Use reflection to get the item's ID and SceneName
+                    var itemDataField = typeof(PersistentBoolItem).GetField("itemData", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (itemDataField != null)
+                    {
+                        var itemData = itemDataField.GetValue(item);
+                        if (itemData != null)
+                        {
+                            var itemType = itemData.GetType();
+
+                            // Get ID
+                            string id = null;
+                            var idProp = itemType.GetProperty("ID");
+                            if (idProp != null) id = idProp.GetValue(itemData)?.ToString();
+                            else
+                            {
+                                var idField = itemType.GetField("ID");
+                                if (idField != null) id = idField.GetValue(itemData)?.ToString();
+                            }
+
+                            // Get SceneName
+                            string sceneName = null;
+                            var sceneProp = itemType.GetProperty("SceneName");
+                            if (sceneProp != null) sceneName = sceneProp.GetValue(itemData)?.ToString();
+                            else
+                            {
+                                var sceneField = itemType.GetField("SceneName");
+                                if (sceneField != null) sceneName = sceneField.GetValue(itemData)?.ToString();
+                            }
+
+                            if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(sceneName))
+                            {
+                                bool savedValue = SceneData.instance.PersistentBools.GetValueOrDefault(sceneName, id);
+                                if (savedValue)
+                                {
+                                    item.SetValueOverride(true);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogWarning($"Failed to restore persistent item {item.name}: {e.Message}");
                 }
             }
         }
