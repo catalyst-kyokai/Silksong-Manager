@@ -63,6 +63,10 @@ namespace SilksongManager.SaveState
                 // Capture PlayerData
                 state.PlayerDataJson = JsonConvert.SerializeObject(Plugin.PD);
 
+                // Force all PersistentBoolItems to update their values in SceneData BEFORE serialization
+                // This is necessary because the game only persists on scene exit, not in real-time
+                ForceSavePersistentItems();
+
                 // Capture SceneData
                 if (SceneData.instance != null)
                 {
@@ -668,11 +672,52 @@ namespace SilksongManager.SaveState
             }
         }
 
+        private static void ForceSavePersistentItems()
+        {
+            // The game only persists PersistentBoolItem states on scene exit
+            // We need to force them to save their current state to SceneData NOW before we serialize it
+
+            var persistentItems = UnityEngine.Object.FindObjectsOfType<PersistentBoolItem>();
+            var updateValueMethod = typeof(PersistentBoolItem).BaseType?.GetMethod("UpdateValue", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Plugin.Log.LogInfo($"[DEBUG] ForceSavePersistentItems: Found {persistentItems.Length} items, UpdateValue method: {updateValueMethod != null}");
+
+            int savedCount = 0;
+            foreach (var item in persistentItems)
+            {
+                try
+                {
+                    // Call UpdateValue() to force the item to persist its current state
+                    if (updateValueMethod != null)
+                    {
+                        updateValueMethod.Invoke(item, null);
+                        savedCount++;
+
+                        // Log the value that was saved
+                        string id = item.GetId();
+                        string sceneName = item.GetSceneName();
+                        if (string.IsNullOrEmpty(id)) id = item.name;
+                        if (string.IsNullOrEmpty(sceneName)) sceneName = GameManager.GetBaseSceneName(item.gameObject.scene.name);
+
+                        bool savedValue = SceneData.instance.PersistentBools.GetValueOrDefault(sceneName, id);
+                        Plugin.Log.LogInfo($"[DEBUG] Saved '{item.name}' (scene={sceneName}, id={id}) = {savedValue}");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogWarning($"Failed to save persistent item {item.name}: {e.Message}");
+                }
+            }
+
+            Plugin.Log.LogInfo($"[DEBUG] ForceSavePersistentItems: Saved {savedCount} items");
+        }
+
         private static void RestorePersistentBoolItems()
         {
             // PersistentBoolItems already ran Start() during scene initialization
             // BUT they may have loaded from OLD SceneData before we restored ours
             // We need to FORCE them to re-read the restored SceneData values
+
 
             var persistentItems = UnityEngine.Object.FindObjectsOfType<PersistentBoolItem>();
             int restoredCount = 0;
