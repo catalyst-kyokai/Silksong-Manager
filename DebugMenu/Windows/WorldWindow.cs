@@ -9,15 +9,25 @@ namespace SilksongManager.DebugMenu.Windows
     /// </summary>
     public class WorldWindow : BaseWindow
     {
+        #region Window Properties
+
         public override int WindowId => 10003;
         public override string Title => "World";
         protected override Vector2 DefaultSize => new Vector2(300, 380);
 
+        #endregion
+
+        #region Private Fields
+
+        /// <summary>Current game speed value.</summary>
         private float _gameSpeed = 1f;
+
+        #endregion
+
+        #region Drawing Methods
 
         protected override void DrawContent()
         {
-            // Position section
             DebugMenuStyles.DrawSectionHeader("POSITION");
 
             var hero = Plugin.Hero;
@@ -28,73 +38,69 @@ namespace SilksongManager.DebugMenu.Windows
             }
             else
             {
-                GUILayout.Label("Position: N/A", DebugMenuStyles.Label);
+                GUILayout.Label("Not in game", DebugMenuStyles.LabelCentered);
             }
 
             GUILayout.BeginHorizontal();
-
-            if (GUILayout.Button("Save", DebugMenuStyles.Button))
+            if (GUILayout.Button("Save Pos", DebugMenuStyles.Button))
             {
                 World.WorldActions.SavePosition();
             }
             DrawKeybindHint(ModAction.SavePosition);
+            GUILayout.EndHorizontal();
 
-            if (GUILayout.Button("Load", DebugMenuStyles.Button))
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Load Pos", DebugMenuStyles.Button))
             {
                 World.WorldActions.LoadPosition();
             }
             DrawKeybindHint(ModAction.LoadPosition);
-
             GUILayout.EndHorizontal();
 
-            // Game speed section
+            GUILayout.Space(8);
             DebugMenuStyles.DrawSectionHeader("GAME SPEED");
 
-            _gameSpeed = Time.timeScale;
-
-            GUILayout.Label($"Current: {_gameSpeed:F2}x", DebugMenuStyles.Label);
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("0.1", DebugMenuStyles.Label, GUILayout.Width(25));
+            GUILayout.Label($"Speed: {_gameSpeed:F1}x", DebugMenuStyles.Label);
             _gameSpeed = GUILayout.HorizontalSlider(_gameSpeed, 0.1f, 5f);
-            GUILayout.Label("5.0", DebugMenuStyles.Label, GUILayout.Width(25));
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("0.5x", DebugMenuStyles.ButtonSmall)) _gameSpeed = 0.5f;
+            if (GUILayout.Button("1x", DebugMenuStyles.ButtonSmall)) _gameSpeed = 1f;
+            if (GUILayout.Button("2x", DebugMenuStyles.ButtonSmall)) _gameSpeed = 2f;
+            if (GUILayout.Button("Apply", DebugMenuStyles.ButtonSmall)) World.WorldActions.SetGameSpeed(_gameSpeed);
             GUILayout.EndHorizontal();
 
-            if (Mathf.Abs(_gameSpeed - Time.timeScale) > 0.01f)
+            GUILayout.Space(8);
+            DebugMenuStyles.DrawSectionHeader("ACTIONS");
+
+            if (GUILayout.Button("Reload Scene", DebugMenuStyles.Button))
             {
-                World.WorldActions.SetGameSpeed(_gameSpeed);
+                World.WorldActions.ReloadCurrentScene();
             }
 
             GUILayout.BeginHorizontal();
-
-            if (GUILayout.Button("0.5x", DebugMenuStyles.ButtonSmall))
+            if (GUILayout.Button("Pause", DebugMenuStyles.Button))
             {
-                World.WorldActions.SetGameSpeed(0.5f);
+                World.WorldActions.PauseGame();
             }
-            if (GUILayout.Button("1x", DebugMenuStyles.ButtonSmall))
+            if (GUILayout.Button("Resume", DebugMenuStyles.Button))
             {
-                World.WorldActions.SetGameSpeed(1f);
+                World.WorldActions.ResumeGame();
             }
-            if (GUILayout.Button("2x", DebugMenuStyles.ButtonSmall))
-            {
-                World.WorldActions.SetGameSpeed(2f);
-            }
-            if (GUILayout.Button("5x", DebugMenuStyles.ButtonSmall))
-            {
-                World.WorldActions.SetGameSpeed(5f);
-            }
-
             GUILayout.EndHorizontal();
 
-            // Scene info
             DebugMenuStyles.DrawSectionHeader("SCENE");
 
             var gm = Plugin.GM;
             if (gm != null)
             {
-                GUILayout.Label($"Scene: {gm.sceneName}", DebugMenuStyles.Label);
+                GUILayout.Label($"Current: {gm.sceneName}", DebugMenuStyles.Label);
             }
         }
+
+        #endregion
+
+        #region Helpers
 
         private void DrawKeybindHint(ModAction action)
         {
@@ -104,5 +110,7 @@ namespace SilksongManager.DebugMenu.Windows
                 GUILayout.Label($"[{DebugMenuStyles.KeyCodeToString(key)}]", DebugMenuStyles.Label, GUILayout.Width(50));
             }
         }
+
+        #endregion
     }
 }

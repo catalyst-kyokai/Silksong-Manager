@@ -13,40 +13,80 @@ namespace SilksongManager.Player
     /// </summary>
     public static class CheatSystem
     {
-        // Cheat states
+        #region Cheat State Fields
+
+        /// <summary>Whether infinite jumps cheat is enabled.</summary>
         private static bool _infiniteJumps = false;
+        /// <summary>Whether infinite health cheat is enabled.</summary>
         private static bool _infiniteHealth = false;
+        /// <summary>Whether infinite silk cheat is enabled.</summary>
         private static bool _infiniteSilk = false;
+        /// <summary>Whether noclip mode is enabled.</summary>
         private static bool _noclipEnabled = false;
 
-        // Noclip state
+        #endregion
+
+        #region Noclip State
+
+        /// <summary>Original gravity scale before noclip was enabled.</summary>
         private static float _originalGravityScale = 1f;
+        /// <summary>Original body type before noclip was enabled.</summary>
         private static RigidbodyType2D _originalBodyType;
+        /// <summary>Whether player was invincible before noclip.</summary>
         private static bool _wasInvincible = false;
+        /// <summary>Collider enabled states before noclip.</summary>
         private static Dictionary<Collider2D, bool> _colliderStates = new Dictionary<Collider2D, bool>();
 
-        // Health/Silk tracking
+        #endregion
+
+        #region Tracking Fields
+
+        /// <summary>Last recorded health value for infinite health tracking.</summary>
         private static int _lastHealth = 0;
+        /// <summary>Last recorded silk value for infinite silk tracking.</summary>
         private static int _lastSilk = 0;
 
-        // Reflection cache
+        #endregion
+
+        #region Reflection Cache
+
+        /// <summary>Cached field info for HeroController.doubleJumped.</summary>
         private static FieldInfo _doubleJumpedField;
+        /// <summary>Whether reflection has been initialized.</summary>
         private static bool _reflectionInitialized = false;
 
-        // Config
+        #endregion
+
+        #region Configuration Entries
+
+        /// <summary>Config entry for infinite jumps persistence.</summary>
         private static ConfigEntry<bool> _infiniteJumpsConfig;
+        /// <summary>Config entry for infinite health persistence.</summary>
         private static ConfigEntry<bool> _infiniteHealthConfig;
+        /// <summary>Config entry for infinite silk persistence.</summary>
         private static ConfigEntry<bool> _infiniteSilkConfig;
 
-        // Properties
+        #endregion
+
+        #region Public Properties
+
+        /// <summary>Gets whether infinite jumps is currently enabled.</summary>
         public static bool InfiniteJumps => _infiniteJumps;
+        /// <summary>Gets whether infinite health is currently enabled.</summary>
         public static bool InfiniteHealth => _infiniteHealth;
+        /// <summary>Gets whether infinite silk is currently enabled.</summary>
         public static bool InfiniteSilk => _infiniteSilk;
+        /// <summary>Gets whether noclip mode is currently enabled.</summary>
         public static bool NoclipEnabled => _noclipEnabled;
 
+        #endregion
+
+        #region Initialization
+
         /// <summary>
-        /// Initialize cheat system with config.
+        /// Initializes the cheat system with config file binding.
         /// </summary>
+        /// <param name="config">BepInEx configuration file.</param>
         public static void Initialize(ConfigFile config)
         {
             _infiniteJumpsConfig = config.Bind("Cheats", "InfiniteJumps", false, "Enable infinite jumps");
@@ -87,6 +127,10 @@ namespace SilksongManager.Player
 
             _reflectionInitialized = true;
         }
+
+        #endregion
+
+        #region Update Processing
 
         /// <summary>
         /// Call every frame to process cheats.
@@ -131,13 +175,17 @@ namespace SilksongManager.Player
             }
         }
 
+        #endregion
+
+        #region Cheat Processing Methods
+
+        /// <summary>
+        /// Processes infinite jumps by keeping player grounded.
+        /// </summary>
         private static void ProcessInfiniteJumps(HeroController hero)
         {
-            // Make game ALWAYS think player is on ground = infinite jumps anywhere
-            // Set unconditionally every frame - no conditions
             hero.cState.onGround = true;
 
-            // Also reset doubleJumped flag as backup
             if (_doubleJumpedField != null)
             {
                 try
@@ -148,6 +196,9 @@ namespace SilksongManager.Player
             }
         }
 
+        /// <summary>
+        /// Processes infinite health by restoring health when decreased.
+        /// </summary>
         private static void ProcessInfiniteHealth(PlayerData pd)
         {
             if (pd.health < _lastHealth && pd.health > 0)
@@ -160,6 +211,9 @@ namespace SilksongManager.Player
             }
         }
 
+        /// <summary>
+        /// Processes infinite silk by restoring silk when decreased.
+        /// </summary>
         private static void ProcessInfiniteSilk(PlayerData pd)
         {
             if (pd.silk < _lastSilk)
@@ -172,6 +226,9 @@ namespace SilksongManager.Player
             }
         }
 
+        /// <summary>
+        /// Processes noclip movement based on input.
+        /// </summary>
         private static void ProcessNoclipMovement(HeroController hero)
         {
             var rb = hero.GetComponent<Rigidbody2D>();
@@ -181,12 +238,13 @@ namespace SilksongManager.Player
             float h = Input.GetAxis("Horizontal");
             float v = Input.GetAxis("Vertical");
 
-            // Use shift for faster movement
             if (Input.GetKey(KeyCode.LeftShift))
                 speed = 30f;
 
             rb.linearVelocity = new Vector2(h * speed, v * speed);
         }
+
+        #endregion
 
         #region Toggle Methods
 

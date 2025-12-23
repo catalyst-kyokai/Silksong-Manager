@@ -9,12 +9,24 @@ namespace SilksongManager.DebugMenu.Windows
     /// </summary>
     public class ItemsWindow : BaseWindow
     {
+        #region Window Properties
+
         public override int WindowId => 10005;
         public override string Title => "Items";
         protected override Vector2 DefaultSize => new Vector2(280, 350);
 
+        #endregion
+
+        #region Private Fields
+
+        /// <summary>Custom geo amount input.</summary>
         private int _geoAmount = 1000;
+        /// <summary>Custom shards amount input.</summary>
         private int _shardsAmount = 5;
+
+        #endregion
+
+        #region Drawing Methods
 
         protected override void DrawContent()
         {
@@ -26,7 +38,6 @@ namespace SilksongManager.DebugMenu.Windows
                 return;
             }
 
-            // Geo section
             DebugMenuStyles.DrawSectionHeader("GEO");
 
             GUILayout.Label($"Current: {pd.geo}", DebugMenuStyles.Label);
@@ -59,7 +70,6 @@ namespace SilksongManager.DebugMenu.Windows
             }
             GUILayout.EndHorizontal();
 
-            // Shell Shards section
             DebugMenuStyles.DrawSectionHeader("SHELL SHARDS");
 
             GUILayout.BeginHorizontal();
@@ -80,7 +90,6 @@ namespace SilksongManager.DebugMenu.Windows
 
             GUILayout.EndHorizontal();
 
-            // Tools section
             DebugMenuStyles.DrawSectionHeader("TOOLS");
 
             if (GUILayout.Button("Unlock All Tools", DebugMenuStyles.Button))
@@ -88,6 +97,10 @@ namespace SilksongManager.DebugMenu.Windows
                 Tools.ToolActions.UnlockAllTools();
             }
         }
+
+        #endregion
+
+        #region Helpers
 
         private void DrawKeybindHint(ModAction action)
         {
@@ -97,5 +110,7 @@ namespace SilksongManager.DebugMenu.Windows
                 GUILayout.Label($"[{DebugMenuStyles.KeyCodeToString(key)}]", DebugMenuStyles.Label, GUILayout.Width(50));
             }
         }
+
+        #endregion
     }
 }

@@ -27,16 +27,31 @@ namespace SilksongManager.Menu.Keybinds
         IncreaseGameSpeed,
         DecreaseGameSpeed,
         ResetGameSpeed,
-        ToggleHitboxes
+        ToggleHitboxes,
+        // New save state actions
+        SaveState,
+        LoadLastState,
+        // Scene actions
+        ReloadScene,
+        Respawn
     }
 
     /// <summary>
     /// Manages mod keybinds - storage, loading, conflict detection.
+    /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class ModKeybindManager
     {
+        #region Private Fields
+
+        /// <summary>Configuration entries for keybinds.</summary>
         private static Dictionary<ModAction, ConfigEntry<KeyCode>> _keybindConfigs;
+        /// <summary>Whether the manager has been initialized.</summary>
         private static bool _initialized = false;
+
+        #endregion
+
+        #region Default Keybinds
 
         /// <summary>
         /// Default keybinds for each mod action.
@@ -60,7 +75,11 @@ namespace SilksongManager.Menu.Keybinds
             { ModAction.IncreaseGameSpeed, KeyCode.Equals },
             { ModAction.DecreaseGameSpeed, KeyCode.Minus },
             { ModAction.ResetGameSpeed, KeyCode.Alpha0 },
-            { ModAction.ToggleHitboxes, KeyCode.F4 }
+            { ModAction.ToggleHitboxes, KeyCode.F4 },
+            { ModAction.SaveState, KeyCode.F6 },
+            { ModAction.LoadLastState, KeyCode.F7 },
+            { ModAction.ReloadScene, KeyCode.F8 },
+            { ModAction.Respawn, KeyCode.R }
         };
 
         /// <summary>
@@ -85,7 +104,11 @@ namespace SilksongManager.Menu.Keybinds
             { ModAction.IncreaseGameSpeed, "Speed Up" },
             { ModAction.DecreaseGameSpeed, "Speed Down" },
             { ModAction.ResetGameSpeed, "Reset Speed" },
-            { ModAction.ToggleHitboxes, "Show Hitboxes" }
+            { ModAction.ToggleHitboxes, "Show Hitboxes" },
+            { ModAction.SaveState, "Quick Save" },
+            { ModAction.LoadLastState, "Quick Load" },
+            { ModAction.ReloadScene, "Reload Scene" },
+            { ModAction.Respawn, "Respawn" }
         };
 
         /// <summary>
@@ -292,5 +315,7 @@ namespace SilksongManager.Menu.Keybinds
                 _ => InControl.Key.None
             };
         }
+
+        #endregion
     }
 }

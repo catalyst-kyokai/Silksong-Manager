@@ -9,12 +9,24 @@ namespace SilksongManager.DebugMenu.Windows
     /// </summary>
     public class PlayerWindow : BaseWindow
     {
+        #region Window Properties
+
         public override int WindowId => 10002;
         public override string Title => "Player";
         protected override Vector2 DefaultSize => new Vector2(280, 350);
 
+        #endregion
+
+        #region Private Fields
+
+        /// <summary>Health value input.</summary>
         private int _healthInput = 10;
+        /// <summary>Silk value input (unused, kept for future).</summary>
         private int _silkInput = 10;
+
+        #endregion
+
+        #region Drawing Methods
 
         protected override void DrawContent()
         {
@@ -27,7 +39,6 @@ namespace SilksongManager.DebugMenu.Windows
                 return;
             }
 
-            // Health section
             DebugMenuStyles.DrawSectionHeader("HEALTH");
 
             GUILayout.BeginHorizontal();
@@ -48,7 +59,6 @@ namespace SilksongManager.DebugMenu.Windows
             }
             GUILayout.EndHorizontal();
 
-            // Silk section
             DebugMenuStyles.DrawSectionHeader("SILK");
 
             GUILayout.BeginHorizontal();
@@ -59,10 +69,8 @@ namespace SilksongManager.DebugMenu.Windows
             }
             GUILayout.EndHorizontal();
 
-            // Toggles section
             DebugMenuStyles.DrawSectionHeader("TOGGLES");
 
-            // Invincibility
             GUILayout.BeginHorizontal();
             bool isInvincible = pd.isInvincible;
             if (DebugMenuStyles.DrawToggleButton(isInvincible ? "Invincibility ✓" : "Invincibility", isInvincible))
@@ -72,7 +80,6 @@ namespace SilksongManager.DebugMenu.Windows
             DrawKeybindHint(ModAction.ToggleInvincibility);
             GUILayout.EndHorizontal();
 
-            // Noclip - use CheatSystem
             GUILayout.BeginHorizontal();
             bool isNoclip = Player.CheatSystem.NoclipEnabled;
             if (DebugMenuStyles.DrawToggleButton(isNoclip ? "Noclip ✓" : "Noclip", isNoclip))
@@ -82,7 +89,6 @@ namespace SilksongManager.DebugMenu.Windows
             DrawKeybindHint(ModAction.ToggleNoclip);
             GUILayout.EndHorizontal();
 
-            // Infinite Jumps - use CheatSystem
             GUILayout.BeginHorizontal();
             bool infiniteJumps = Player.CheatSystem.InfiniteJumps;
             if (DebugMenuStyles.DrawToggleButton(infiniteJumps ? "Infinite Jumps ✓" : "Infinite Jumps", infiniteJumps))
@@ -92,7 +98,6 @@ namespace SilksongManager.DebugMenu.Windows
             DrawKeybindHint(ModAction.ToggleInfiniteJumps);
             GUILayout.EndHorizontal();
 
-            // Infinite Health - use CheatSystem
             GUILayout.BeginHorizontal();
             bool infiniteHealth = Player.CheatSystem.InfiniteHealth;
             if (DebugMenuStyles.DrawToggleButton(infiniteHealth ? "Infinite Health ✓" : "Infinite Health", infiniteHealth))
@@ -102,7 +107,6 @@ namespace SilksongManager.DebugMenu.Windows
             DrawKeybindHint(ModAction.ToggleInfiniteHealth);
             GUILayout.EndHorizontal();
 
-            // Infinite Silk - use CheatSystem
             GUILayout.BeginHorizontal();
             bool infiniteSilk = Player.CheatSystem.InfiniteSilk;
             if (DebugMenuStyles.DrawToggleButton(infiniteSilk ? "Infinite Silk ✓" : "Infinite Silk", infiniteSilk))
@@ -113,6 +117,10 @@ namespace SilksongManager.DebugMenu.Windows
             GUILayout.EndHorizontal();
         }
 
+        #endregion
+
+        #region Helpers
+
         private void DrawKeybindHint(ModAction action)
         {
             var key = ModKeybindManager.GetKeybind(action);
@@ -121,5 +129,7 @@ namespace SilksongManager.DebugMenu.Windows
                 GUILayout.Label($"[{DebugMenuStyles.KeyCodeToString(key)}]", DebugMenuStyles.Label, GUILayout.Width(60));
             }
         }
+
+        #endregion
     }
 }

@@ -11,17 +11,29 @@ namespace SilksongManager.Menu.Keybinds
 {
     /// <summary>
     /// Builds and manages the mod keybinds menu screen by cloning the actual keyboard menu.
+    /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class ModKeybindsScreen
     {
+        #region Private Fields
+
+        /// <summary>The keybinds menu screen.</summary>
         private static MenuScreen _keybindsMenuScreen;
+        /// <summary>List of mappable key entries.</summary>
         private static List<ModMappableKeyEntry> _mappableEntries = new List<ModMappableKeyEntry>();
+        /// <summary>Whether the screen has been initialized.</summary>
         private static bool _initialized = false;
+        /// <summary>Whether the screen is currently active.</summary>
         private static bool _isActive = false;
 
-        // Pending conflict resolution
+        /// <summary>Pending entry for conflict resolution.</summary>
         private static ModMappableKeyEntry _pendingEntry;
+        /// <summary>Pending keycode for conflict resolution.</summary>
         private static KeyCode _pendingKeyCode;
+
+        #endregion
+
+        #region Initialization
 
         /// <summary>
         /// Initialize by cloning the keyboard menu from the game.
@@ -42,6 +54,9 @@ namespace SilksongManager.Menu.Keybinds
             }
         }
 
+        /// <summary>
+        /// Resets the screen state.
+        /// </summary>
         public static void Reset()
         {
             _initialized = false;
@@ -50,8 +65,14 @@ namespace SilksongManager.Menu.Keybinds
             _isActive = false;
         }
 
+        /// <summary>Gets the keybinds menu screen.</summary>
         public static MenuScreen GetScreen() => _keybindsMenuScreen;
+        /// <summary>Whether the screen is currently active.</summary>
         public static bool IsActive => _isActive;
+
+        #endregion
+
+        #region Screen Creation
 
         private static void CreateFromKeyboardMenu()
         {
@@ -255,92 +276,264 @@ namespace SilksongManager.Menu.Keybinds
         }
 
         private static MenuButton _resetButton;
+        private static ScrollRect _scrollRect;
+        private static Scrollbar _scrollbar;
 
         private static GameObject CreateContentContainer(Transform parent, MappableKey templateKey)
         {
-            // Create scrollable content
+            // Create scroll area container
+            var scrollAreaObj = new GameObject("ScrollArea");
+            scrollAreaObj.transform.SetParent(parent, false);
+
+            var scrollAreaRect = scrollAreaObj.AddComponent<RectTransform>();
+            // Position: leave space for title at top and buttons at bottom
+            scrollAreaRect.anchorMin = new Vector2(0.05f, 0.22f);  // Higher bottom margin for buttons
+            scrollAreaRect.anchorMax = new Vector2(0.95f, 0.82f);  // Leave room for title
+            scrollAreaRect.offsetMin = Vector2.zero;
+            scrollAreaRect.offsetMax = Vector2.zero;
+
+            // Create viewport with mask
+            var viewportObj = new GameObject("Viewport");
+            viewportObj.transform.SetParent(scrollAreaObj.transform, false);
+
+            var viewportRect = viewportObj.AddComponent<RectTransform>();
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = new Vector2(0.96f, 1f);  // Leave space for scrollbar on right
+            viewportRect.offsetMin = Vector2.zero;
+            viewportRect.offsetMax = Vector2.zero;
+
+            viewportObj.AddComponent<RectMask2D>();
+            var viewportImage = viewportObj.AddComponent<Image>();
+            viewportImage.color = Color.clear;
+
+            // Create content panel inside viewport
             var contentObj = new GameObject("Content");
-            contentObj.transform.SetParent(parent, false);
+            contentObj.transform.SetParent(viewportObj.transform, false);
 
             var contentRect = contentObj.AddComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0.05f, 0.20f); // Shifted furher left (was 0.05)
-            contentRect.anchorMax = new Vector2(0.80f, 0.80f); // Shifted further left (was 0.85)
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.anchoredPosition = Vector2.zero;
 
-            contentRect.offsetMin = Vector2.zero;
-            contentRect.offsetMax = Vector2.zero;
+            // Content size will be set by ContentSizeFitter
+            var sizeFitter = contentObj.AddComponent<ContentSizeFitter>();
+            sizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            sizeFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
-            // Create two-column layout
-            // Create two-column layout with central gap
-            // Left column: 5% to 45% width, Full height
-            var leftColumn = CreateColumn(contentObj.transform, new Vector2(0.05f, 0f), new Vector2(0.45f, 1f));
-            // Right column: 55% to 95% width, Full height
-            var rightColumn = CreateColumn(contentObj.transform, new Vector2(0.55f, 0f), new Vector2(0.95f, 1f));
+            // Add vertical layout to content
+            var contentLayout = contentObj.AddComponent<VerticalLayoutGroup>();
+            contentLayout.childAlignment = TextAnchor.UpperCenter;
+            contentLayout.spacing = 10;
+            contentLayout.childControlHeight = false;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.childForceExpandWidth = true;
+            contentLayout.padding = new RectOffset(0, 0, 10, 10);
 
-            // Get all actions
+            // Create two-column row containers
             var actions = (ModAction[])Enum.GetValues(typeof(ModAction));
             int halfCount = (actions.Length + 1) / 2;
 
             _mappableEntries.Clear();
 
-            for (int i = 0; i < actions.Length; i++)
+            // Create entries in rows with proper two-column layout
+            // Key insight: Row needs explicit width for child anchors to work
+            for (int i = 0; i < halfCount; i++)
             {
-                var column = i < halfCount ? leftColumn : rightColumn;
-                var entry = CreateKeybindEntry(column, actions[i], templateKey);
-                _mappableEntries.Add(entry);
+                var rowObj = new GameObject($"Row_{i}");
+                rowObj.transform.SetParent(contentObj.transform, false);
+
+                var rowRect = rowObj.AddComponent<RectTransform>();
+                // Let VerticalLayoutGroup control size
+                rowRect.anchorMin = new Vector2(0f, 1f);
+                rowRect.anchorMax = new Vector2(1f, 1f);
+                rowRect.pivot = new Vector2(0.5f, 1f);
+
+                // Add layout element to control row height
+                var rowLayoutElement = rowObj.AddComponent<LayoutElement>();
+                rowLayoutElement.preferredHeight = 60;
+                rowLayoutElement.minHeight = 60;
+
+                // === LEFT HALF (0% - 40% of row width) ===
+                var leftHalfObj = new GameObject("LeftHalf");
+                leftHalfObj.transform.SetParent(rowObj.transform, false);
+                var leftHalfRect = leftHalfObj.AddComponent<RectTransform>();
+                leftHalfRect.anchorMin = new Vector2(0f, 0f);
+                leftHalfRect.anchorMax = new Vector2(0.40f, 1f);  // 40% width
+                leftHalfRect.offsetMin = Vector2.zero;
+                leftHalfRect.offsetMax = Vector2.zero;
+                leftHalfRect.pivot = new Vector2(1f, 0.5f);  // Right pivot for right alignment
+
+                // Left entry (right-aligned within left half)
+                var leftEntry = CreateKeybindEntry(leftHalfObj.transform, actions[i], templateKey, TextAnchor.MiddleRight);
+                _mappableEntries.Add(leftEntry);
+
+                // === RIGHT HALF (60% - 100% of row width) ===
+                // 20% gap between 40% and 60%
+                int rightIndex = i + halfCount;
+                if (rightIndex < actions.Length)
+                {
+                    var rightHalfObj = new GameObject("RightHalf");
+                    rightHalfObj.transform.SetParent(rowObj.transform, false);
+                    var rightHalfRect = rightHalfObj.AddComponent<RectTransform>();
+                    rightHalfRect.anchorMin = new Vector2(0.60f, 0f);  // Start at 60%
+                    rightHalfRect.anchorMax = new Vector2(1f, 1f);
+                    rightHalfRect.offsetMin = Vector2.zero;
+                    rightHalfRect.offsetMax = Vector2.zero;
+                    rightHalfRect.pivot = new Vector2(0f, 0.5f);  // Left pivot for left alignment
+
+                    // Right entry (left-aligned within right half)
+                    var rightEntry = CreateKeybindEntry(rightHalfObj.transform, actions[rightIndex], templateKey, TextAnchor.MiddleLeft);
+                    _mappableEntries.Add(rightEntry);
+                }
+
+                // Debug log first row
+                if (i == 0)
+                {
+                    Plugin.Log.LogInfo($"[KeybindsLayout] Row_0 created. LeftHalf anchors: min(0,0) max(0.45,1), RightHalf anchors: min(0.55,0) max(1,1)");
+                }
+            }
+
+            Plugin.Log.LogInfo($"[KeybindsLayout] Created {halfCount} rows with {_mappableEntries.Count} entries");
+
+            // Clone scrollbar from achievements screen
+            _scrollbar = CloneAchievementsScrollbar(scrollAreaObj.transform);
+
+            // Add ScrollRect component
+            _scrollRect = scrollAreaObj.AddComponent<ScrollRect>();
+            _scrollRect.content = contentRect;
+            _scrollRect.viewport = viewportRect;
+            _scrollRect.horizontal = false;
+            _scrollRect.vertical = true;
+            _scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            _scrollRect.scrollSensitivity = 30f;
+            _scrollRect.inertia = true;
+            _scrollRect.decelerationRate = 0.135f;
+
+            if (_scrollbar != null)
+            {
+                _scrollRect.verticalScrollbar = _scrollbar;
+                _scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+                _scrollRect.verticalScrollbarSpacing = -5f;
             }
 
             // Setup navigation between entries
             SetupNavigation();
 
-            return contentObj;
+            return scrollAreaObj;
         }
 
-        private static Transform CreateColumn(Transform parent, Vector2 anchorMin, Vector2 anchorMax)
+        private static Scrollbar CloneAchievementsScrollbar(Transform parent)
         {
-            var colObj = new GameObject("Column");
-            colObj.transform.SetParent(parent, false);
+            try
+            {
+                var achievementsScreen = UIManager.instance.achievementsMenuScreen;
+                if (achievementsScreen == null)
+                {
+                    Plugin.Log.LogWarning("Achievements screen not found, creating default scrollbar");
+                    return CreateDefaultScrollbar(parent);
+                }
 
-            var colRect = colObj.AddComponent<RectTransform>();
-            colRect.anchorMin = anchorMin;
-            colRect.anchorMax = anchorMax;
-            colRect.offsetMin = Vector2.zero;
-            colRect.offsetMax = Vector2.zero;
+                var templateScrollbar = achievementsScreen.GetComponentInChildren<Scrollbar>(true);
+                if (templateScrollbar == null)
+                {
+                    Plugin.Log.LogWarning("Scrollbar not found in achievements screen, creating default");
+                    return CreateDefaultScrollbar(parent);
+                }
 
-            var layout = colObj.AddComponent<VerticalLayoutGroup>();
-            layout.childAlignment = TextAnchor.UpperCenter;
-            layout.spacing = 20;
-            layout.childControlHeight = false;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = true;
-            layout.padding = new RectOffset(10, 10, 20, 20);
+                // Clone the scrollbar
+                var scrollbarObj = Object.Instantiate(templateScrollbar.gameObject, parent);
+                scrollbarObj.name = "Scrollbar";
+                scrollbarObj.SetActive(true);
 
-            return colObj.transform;
+                var scrollbarRect = scrollbarObj.GetComponent<RectTransform>();
+                // Position on the right side
+                scrollbarRect.anchorMin = new Vector2(0.97f, 0.05f);
+                scrollbarRect.anchorMax = new Vector2(1f, 0.95f);
+                scrollbarRect.offsetMin = Vector2.zero;
+                scrollbarRect.offsetMax = Vector2.zero;
+
+                var scrollbar = scrollbarObj.GetComponent<Scrollbar>();
+                scrollbar.direction = Scrollbar.Direction.BottomToTop;
+
+                Plugin.Log.LogInfo("Cloned scrollbar from achievements screen");
+                return scrollbar;
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError($"Failed to clone scrollbar: {e.Message}");
+                return CreateDefaultScrollbar(parent);
+            }
         }
 
-        private static ModMappableKeyEntry CreateKeybindEntry(Transform parent, ModAction action, MappableKey templateKey)
+        private static Scrollbar CreateDefaultScrollbar(Transform parent)
+        {
+            // Create a simple scrollbar if cloning fails
+            var scrollbarObj = new GameObject("Scrollbar");
+            scrollbarObj.transform.SetParent(parent, false);
+
+            var scrollbarRect = scrollbarObj.AddComponent<RectTransform>();
+            scrollbarRect.anchorMin = new Vector2(0.97f, 0.05f);
+            scrollbarRect.anchorMax = new Vector2(1f, 0.95f);
+            scrollbarRect.offsetMin = Vector2.zero;
+            scrollbarRect.offsetMax = Vector2.zero;
+
+            // Background
+            var bgImage = scrollbarObj.AddComponent<Image>();
+            bgImage.color = new Color(0.2f, 0.2f, 0.2f, 0.5f);
+
+            // Handle
+            var handleObj = new GameObject("Handle");
+            handleObj.transform.SetParent(scrollbarObj.transform, false);
+
+            var handleRect = handleObj.AddComponent<RectTransform>();
+            handleRect.anchorMin = Vector2.zero;
+            handleRect.anchorMax = Vector2.one;
+            handleRect.offsetMin = new Vector2(2, 2);
+            handleRect.offsetMax = new Vector2(-2, -2);
+
+            var handleImage = handleObj.AddComponent<Image>();
+            handleImage.color = new Color(0.7f, 0.7f, 0.7f, 0.8f);
+
+            var scrollbar = scrollbarObj.AddComponent<Scrollbar>();
+            scrollbar.handleRect = handleRect;
+            scrollbar.targetGraphic = handleImage;
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+
+            return scrollbar;
+        }
+
+
+        private static ModMappableKeyEntry CreateKeybindEntry(Transform parent, ModAction action, MappableKey templateKey, TextAnchor alignment)
         {
             var entryObj = new GameObject($"Entry_{action}");
             entryObj.transform.SetParent(parent, false);
 
             var entryRect = entryObj.AddComponent<RectTransform>();
-            entryRect.sizeDelta = new Vector2(0, 85); // Increased height
+            // Stretch to fill parent container (LeftHalf or RightHalf)
+            entryRect.anchorMin = Vector2.zero;
+            entryRect.anchorMax = Vector2.one;
+            entryRect.offsetMin = Vector2.zero;
+            entryRect.offsetMax = Vector2.zero;
 
-            // Horizontal layout like game: label  [key]
+            // Horizontal layout like game: label [key]
             var hLayout = entryObj.AddComponent<HorizontalLayoutGroup>();
-            hLayout.childAlignment = TextAnchor.MiddleRight;
-            hLayout.spacing = 60; // Increased spacing
+            hLayout.childAlignment = alignment;  // This aligns children within Entry
+            hLayout.spacing = 15;
             hLayout.childControlWidth = false;
             hLayout.childControlHeight = true;
             hLayout.childForceExpandWidth = false;
+            hLayout.padding = new RectOffset(5, 5, 0, 0);
 
-            // Label (left side)
+            // Label (left side) - wider to fit text
             var labelObj = new GameObject("Label");
             labelObj.transform.SetParent(entryObj.transform, false);
             var labelRect = labelObj.AddComponent<RectTransform>();
-            labelRect.sizeDelta = new Vector2(200, 45);
+            labelRect.sizeDelta = new Vector2(250, 45);
             var labelLayout = labelObj.AddComponent<LayoutElement>();
-            labelLayout.preferredWidth = 200;
+            labelLayout.preferredWidth = 250;
+            labelLayout.flexibleWidth = 0;
 
             var labelText = labelObj.AddComponent<Text>();
             labelText.font = GetGameFont();
@@ -349,15 +542,17 @@ namespace SilksongManager.Menu.Keybinds
             labelText.alignment = TextAnchor.MiddleRight;
             labelText.color = Color.white;
             labelText.text = ModKeybindManager.GetActionName(action).ToUpper();
+            labelText.horizontalOverflow = HorizontalWrapMode.Overflow;  // Don't truncate
 
             // Key button (right side) - styled like game
             var keyBtnObj = new GameObject("KeyButton");
             keyBtnObj.transform.SetParent(entryObj.transform, false);
             var keyRect = keyBtnObj.AddComponent<RectTransform>();
-            keyRect.sizeDelta = new Vector2(110, 65); // Larger button
+            keyRect.sizeDelta = new Vector2(90, 55);
             var keyLayout = keyBtnObj.AddComponent<LayoutElement>();
-            keyLayout.preferredWidth = 110;
-            keyLayout.preferredHeight = 65;
+            keyLayout.preferredWidth = 90;
+            keyLayout.preferredHeight = 55;
+            keyLayout.flexibleWidth = 0;
 
             // Background image (styled like game keys)
             var uibs = UIManager.instance?.uiButtonSkins;
@@ -406,23 +601,65 @@ namespace SilksongManager.Menu.Keybinds
 
         private static void SetupNavigation()
         {
-            for (int i = 0; i < _mappableEntries.Count; i++)
+            // Entries are added in pairs: [0]=left1, [1]=right1, [2]=left2, [3]=right2, etc.
+            // Navigation: Up/Down moves between rows, Left/Right moves within row
+
+            int numEntries = _mappableEntries.Count;
+            int numRows = (numEntries + 1) / 2;
+
+            for (int i = 0; i < numEntries; i++)
             {
                 var entry = _mappableEntries[i];
                 var nav = entry.button.navigation;
                 nav.mode = Navigation.Mode.Explicit;
 
-                // Up: previous entry or wrap to back button
-                if (i > 0)
-                    nav.selectOnUp = _mappableEntries[i - 1].button;
-                else if (_keybindsMenuScreen.backButton != null)
-                    nav.selectOnUp = _keybindsMenuScreen.backButton;
+                bool isLeft = (i % 2) == 0;
+                int row = i / 2;
 
-                // Down: next entry or Reset button
-                if (i < _mappableEntries.Count - 1)
-                    nav.selectOnDown = _mappableEntries[i + 1].button;
-                else if (_resetButton != null)
-                    nav.selectOnDown = _resetButton;
+                // Horizontal navigation within row
+                if (isLeft)
+                {
+                    // Left entry: right goes to right entry in same row
+                    int rightIndex = i + 1;
+                    if (rightIndex < numEntries)
+                        nav.selectOnRight = _mappableEntries[rightIndex].button;
+                }
+                else
+                {
+                    // Right entry: left goes to left entry in same row
+                    nav.selectOnLeft = _mappableEntries[i - 1].button;
+                }
+
+                // Vertical navigation between rows
+                // Up: go to same side in previous row
+                if (row > 0)
+                {
+                    int prevRowSameSide = (row - 1) * 2 + (isLeft ? 0 : 1);
+                    if (prevRowSameSide < numEntries)
+                        nav.selectOnUp = _mappableEntries[prevRowSameSide].button;
+                }
+                else
+                {
+                    // First row: up goes to back button or first entry
+                    if (_keybindsMenuScreen.backButton != null)
+                        nav.selectOnUp = _keybindsMenuScreen.backButton;
+                }
+
+                // Down: go to same side in next row
+                if (row < numRows - 1)
+                {
+                    int nextRowSameSide = (row + 1) * 2 + (isLeft ? 0 : 1);
+                    if (nextRowSameSide < numEntries)
+                        nav.selectOnDown = _mappableEntries[nextRowSameSide].button;
+                    else if ((row + 1) * 2 < numEntries)
+                        nav.selectOnDown = _mappableEntries[(row + 1) * 2].button; // Go to left if right doesn't exist
+                }
+                else
+                {
+                    // Last row: down goes to Reset button
+                    if (_resetButton != null)
+                        nav.selectOnDown = _resetButton;
+                }
 
                 entry.button.navigation = nav;
             }
@@ -433,9 +670,12 @@ namespace SilksongManager.Menu.Keybinds
                 var nav = _resetButton.navigation;
                 nav.mode = Navigation.Mode.Explicit;
 
-                // Up: last entries
-                if (_mappableEntries.Count > 0)
-                    nav.selectOnUp = _mappableEntries[_mappableEntries.Count - 1].button;
+                // Up: last row's left entry
+                if (numEntries > 0)
+                {
+                    int lastRowLeft = ((numEntries - 1) / 2) * 2;
+                    nav.selectOnUp = _mappableEntries[lastRowLeft].button;
+                }
 
                 // Down: Back button
                 if (_keybindsMenuScreen.backButton != null)
@@ -444,12 +684,19 @@ namespace SilksongManager.Menu.Keybinds
                 _resetButton.navigation = nav;
             }
 
-            // Fix Back Button navigation to point up to Reset
+            // Fix Back Button navigation
             if (_keybindsMenuScreen.backButton != null)
             {
                 var nav = _keybindsMenuScreen.backButton.navigation;
                 if (_resetButton != null)
                     nav.selectOnUp = _resetButton;
+                else if (numEntries > 0)
+                    nav.selectOnUp = _mappableEntries[0].button;
+
+                // Down should go to first entry
+                if (numEntries > 0)
+                    nav.selectOnDown = _mappableEntries[0].button;
+
                 _keybindsMenuScreen.backButton.navigation = nav;
             }
         }
@@ -704,6 +951,8 @@ namespace SilksongManager.Menu.Keybinds
             _isActive = false;
             _isExiting = false;
         }
+
+        #endregion
     }
 
     /// <summary>

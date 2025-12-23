@@ -3,20 +3,28 @@ using UnityEngine;
 
 namespace SilksongManager.SaveState
 {
+    /// <summary>
+    /// Represents the captured state of a PlayMaker FSM (Finite State Machine).
+    /// Used to restore enemy AI behavior and game logic state.
+    /// Author: Catalyst (catalyst@kyokai.ru)
+    /// </summary>
     [System.Serializable]
     public class FsmStateData
     {
+        /// <summary>Name of the FSM component (e.g., "Control", "Attack").</summary>
         public string FsmName;
+        /// <summary>Name of the currently active state in the FSM.</summary>
         public string ActiveStateName;
 
-        // Serialized variables (primitives only for now)
+        /// <summary>Captured boolean FSM variables (key: variable name, value: variable value).</summary>
         public Dictionary<string, bool> BoolVariables = new Dictionary<string, bool>();
+        /// <summary>Captured integer FSM variables.</summary>
         public Dictionary<string, int> IntVariables = new Dictionary<string, int>();
+        /// <summary>Captured float FSM variables.</summary>
         public Dictionary<string, float> FloatVariables = new Dictionary<string, float>();
+        /// <summary>Captured string FSM variables.</summary>
         public Dictionary<string, string> StringVariables = new Dictionary<string, string>();
-        // Vector3 is a struct, so it's serializable, but might need helper if using JSON. 
-        // Unity's JSONUtility handles Vector3 fine usually, but Newtonsoft might need a wrapper.
-        // Assuming we rely on standard serialization or Unity's.
+        /// <summary>Captured Vector3 FSM variables.</summary>
         public Dictionary<string, Vector3> Vector3Variables = new Dictionary<string, Vector3>();
     }
 }

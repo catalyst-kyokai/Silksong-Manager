@@ -13,14 +13,29 @@ namespace SilksongManager.Menu
     /// </summary>
     public static class ModSettingsScreen
     {
+        #region Private Fields
+
+        /// <summary>The settings menu screen.</summary>
         private static MenuScreen _settingsScreen;
+        /// <summary>Whether the screen has been initialized.</summary>
         private static bool _initialized = false;
+        /// <summary>Whether the screen is currently active.</summary>
         private static bool _isActive = false;
+        /// <summary>Whether the screen is currently exiting.</summary>
         private static bool _isExiting = false;
 
+        #endregion
+
+        #region Public Properties
+
+        /// <summary>Whether the settings screen is currently active.</summary>
         public static bool IsActive => _isActive;
+        /// <summary>Whether the settings screen is currently exiting.</summary>
         public static bool IsExiting => _isExiting;
 
+        #endregion
+
+        #region Initialization
 
         public static void Initialize()
         {
@@ -84,9 +99,12 @@ namespace SilksongManager.Menu
             ModifyScreenContent(screenObj);
         }
 
+        #endregion
+
+        #region Screen Content
+
         private static void ModifyScreenContent(GameObject screenObj)
         {
-            // Save back button first
             MenuButton savedBackButton = null;
             if (_settingsScreen.backButton != null)
             {
@@ -95,7 +113,6 @@ namespace SilksongManager.Menu
                 savedBackButton.gameObject.SetActive(false);
             }
 
-            // Destroy all children except title and fleur
             var toDestroy = new System.Collections.Generic.List<GameObject>();
             Transform titleTransform = null;
 
@@ -153,13 +170,15 @@ namespace SilksongManager.Menu
                 DestroyLocalization(savedBackButton.gameObject);
             }
 
-            // Create settings content
             CreateSettingsContent(screenObj, savedBackButton);
         }
 
+        #endregion
+
+        #region Toggle Buttons
+
         private static void CreateSettingsContent(GameObject screenObj, MenuButton backButton)
         {
-            // Create settings toggles using cloned buttons
             float startY = 80;
             float spacing = -50;
             int index = 0;
@@ -255,6 +274,10 @@ namespace SilksongManager.Menu
             button.navigation = nav;
         }
 
+        #endregion
+
+        #region Helpers
+
         private static void DestroyLocalization(GameObject obj)
         {
             if (obj == null) return;
@@ -343,6 +366,8 @@ namespace SilksongManager.Menu
             _isActive = false;
             _isExiting = false;
         }
+
+        #endregion
     }
 
     /// <summary>

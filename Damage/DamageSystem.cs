@@ -13,49 +13,87 @@ namespace SilksongManager.Damage
         Spell,
         Summon
     }
-    
+
     /// <summary>
     /// Custom damage system with support for negative, zero, and fractional values.
     /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class DamageSystem
     {
-        // Enable flags
+        #region Enable Flags
+
+        /// <summary>Whether custom nail damage is enabled.</summary>
         private static bool _customNailEnabled = false;
+        /// <summary>Whether custom tool damage is enabled.</summary>
         private static bool _customToolEnabled = false;
+        /// <summary>Whether custom spell damage is enabled.</summary>
         private static bool _customSpellEnabled = false;
+        /// <summary>Whether custom summon damage is enabled.</summary>
         private static bool _customSummonEnabled = false;
-        
-        // Custom damage values (float for fractions, negative for healing)
+
+        #endregion
+
+        #region Damage Values
+
+        /// <summary>Custom nail damage value (supports negative for healing).</summary>
         private static float _nailDamage = 5f;
+        /// <summary>Custom tool damage value.</summary>
         private static float _toolDamage = 10f;
+        /// <summary>Custom spell damage value.</summary>
         private static float _spellDamage = 15f;
+        /// <summary>Custom summon damage value.</summary>
         private static float _summonDamage = 8f;
-        
-        // Multipliers
+
+        #endregion
+
+        #region Multipliers
+
+        /// <summary>Nail damage multiplier.</summary>
         private static float _nailMultiplier = 1f;
+        /// <summary>Tool damage multiplier.</summary>
         private static float _toolMultiplier = 1f;
+        /// <summary>Spell damage multiplier.</summary>
         private static float _spellMultiplier = 1f;
+        /// <summary>Summon damage multiplier.</summary>
         private static float _summonMultiplier = 1f;
+        /// <summary>Global damage multiplier applied to all types.</summary>
         private static float _globalMultiplier = 1f;
-        
-        // Config entries
+
+        #endregion
+
+        #region Configuration Entries
+
+        /// <summary>Config entry for custom nail damage enabled.</summary>
         private static ConfigEntry<bool> _customNailEnabledConfig;
+        /// <summary>Config entry for custom tool damage enabled.</summary>
         private static ConfigEntry<bool> _customToolEnabledConfig;
+        /// <summary>Config entry for custom spell damage enabled.</summary>
         private static ConfigEntry<bool> _customSpellEnabledConfig;
+        /// <summary>Config entry for custom summon damage enabled.</summary>
         private static ConfigEntry<bool> _customSummonEnabledConfig;
+        /// <summary>Config entry for nail damage value.</summary>
         private static ConfigEntry<float> _nailDamageConfig;
+        /// <summary>Config entry for tool damage value.</summary>
         private static ConfigEntry<float> _toolDamageConfig;
+        /// <summary>Config entry for spell damage value.</summary>
         private static ConfigEntry<float> _spellDamageConfig;
+        /// <summary>Config entry for summon damage value.</summary>
         private static ConfigEntry<float> _summonDamageConfig;
+        /// <summary>Config entry for nail multiplier.</summary>
         private static ConfigEntry<float> _nailMultiplierConfig;
+        /// <summary>Config entry for tool multiplier.</summary>
         private static ConfigEntry<float> _toolMultiplierConfig;
+        /// <summary>Config entry for spell multiplier.</summary>
         private static ConfigEntry<float> _spellMultiplierConfig;
+        /// <summary>Config entry for summon multiplier.</summary>
         private static ConfigEntry<float> _summonMultiplierConfig;
+        /// <summary>Config entry for global multiplier.</summary>
         private static ConfigEntry<float> _globalMultiplierConfig;
-        
+
+        #endregion
+
         #region Properties
-        
+
         public static bool CustomNailEnabled
         {
             get => _customNailEnabled;
@@ -65,7 +103,7 @@ namespace SilksongManager.Damage
                 if (_customNailEnabledConfig != null) _customNailEnabledConfig.Value = value;
             }
         }
-        
+
         public static bool CustomToolEnabled
         {
             get => _customToolEnabled;
@@ -75,7 +113,7 @@ namespace SilksongManager.Damage
                 if (_customToolEnabledConfig != null) _customToolEnabledConfig.Value = value;
             }
         }
-        
+
         public static bool CustomSpellEnabled
         {
             get => _customSpellEnabled;
@@ -85,7 +123,7 @@ namespace SilksongManager.Damage
                 if (_customSpellEnabledConfig != null) _customSpellEnabledConfig.Value = value;
             }
         }
-        
+
         public static bool CustomSummonEnabled
         {
             get => _customSummonEnabled;
@@ -95,7 +133,7 @@ namespace SilksongManager.Damage
                 if (_customSummonEnabledConfig != null) _customSummonEnabledConfig.Value = value;
             }
         }
-        
+
         public static float NailDamage
         {
             get => _nailDamage;
@@ -105,7 +143,7 @@ namespace SilksongManager.Damage
                 if (_nailDamageConfig != null) _nailDamageConfig.Value = value;
             }
         }
-        
+
         public static float ToolDamage
         {
             get => _toolDamage;
@@ -115,7 +153,7 @@ namespace SilksongManager.Damage
                 if (_toolDamageConfig != null) _toolDamageConfig.Value = value;
             }
         }
-        
+
         public static float SpellDamage
         {
             get => _spellDamage;
@@ -125,7 +163,7 @@ namespace SilksongManager.Damage
                 if (_spellDamageConfig != null) _spellDamageConfig.Value = value;
             }
         }
-        
+
         public static float SummonDamage
         {
             get => _summonDamage;
@@ -135,7 +173,7 @@ namespace SilksongManager.Damage
                 if (_summonDamageConfig != null) _summonDamageConfig.Value = value;
             }
         }
-        
+
         public static float NailMultiplier
         {
             get => _nailMultiplier;
@@ -145,7 +183,7 @@ namespace SilksongManager.Damage
                 if (_nailMultiplierConfig != null) _nailMultiplierConfig.Value = value;
             }
         }
-        
+
         public static float ToolMultiplier
         {
             get => _toolMultiplier;
@@ -155,7 +193,7 @@ namespace SilksongManager.Damage
                 if (_toolMultiplierConfig != null) _toolMultiplierConfig.Value = value;
             }
         }
-        
+
         public static float SpellMultiplier
         {
             get => _spellMultiplier;
@@ -165,7 +203,7 @@ namespace SilksongManager.Damage
                 if (_spellMultiplierConfig != null) _spellMultiplierConfig.Value = value;
             }
         }
-        
+
         public static float SummonMultiplier
         {
             get => _summonMultiplier;
@@ -175,7 +213,7 @@ namespace SilksongManager.Damage
                 if (_summonMultiplierConfig != null) _summonMultiplierConfig.Value = value;
             }
         }
-        
+
         public static float GlobalMultiplier
         {
             get => _globalMultiplier;
@@ -185,9 +223,9 @@ namespace SilksongManager.Damage
                 if (_globalMultiplierConfig != null) _globalMultiplierConfig.Value = value;
             }
         }
-        
+
         #endregion
-        
+
         /// <summary>
         /// Initialize damage system with config.
         /// </summary>
@@ -198,40 +236,40 @@ namespace SilksongManager.Damage
             _customToolEnabledConfig = config.Bind("Damage", "CustomToolEnabled", false, "Enable custom tool damage");
             _customSpellEnabledConfig = config.Bind("Damage", "CustomSpellEnabled", false, "Enable custom spell damage");
             _customSummonEnabledConfig = config.Bind("Damage", "CustomSummonEnabled", false, "Enable custom summon damage");
-            
+
             // Damage values
             _nailDamageConfig = config.Bind("Damage", "NailDamage", 5f, "Custom nail damage value");
             _toolDamageConfig = config.Bind("Damage", "ToolDamage", 10f, "Custom tool damage value");
             _spellDamageConfig = config.Bind("Damage", "SpellDamage", 15f, "Custom spell damage value");
             _summonDamageConfig = config.Bind("Damage", "SummonDamage", 8f, "Custom summon damage value");
-            
+
             // Multipliers
             _nailMultiplierConfig = config.Bind("Damage", "NailMultiplier", 1f, "Nail damage multiplier");
             _toolMultiplierConfig = config.Bind("Damage", "ToolMultiplier", 1f, "Tool damage multiplier");
             _spellMultiplierConfig = config.Bind("Damage", "SpellMultiplier", 1f, "Spell damage multiplier");
             _summonMultiplierConfig = config.Bind("Damage", "SummonMultiplier", 1f, "Summon damage multiplier");
             _globalMultiplierConfig = config.Bind("Damage", "GlobalMultiplier", 1f, "Global damage multiplier");
-            
+
             // Load values
             _customNailEnabled = _customNailEnabledConfig.Value;
             _customToolEnabled = _customToolEnabledConfig.Value;
             _customSpellEnabled = _customSpellEnabledConfig.Value;
             _customSummonEnabled = _customSummonEnabledConfig.Value;
-            
+
             _nailDamage = _nailDamageConfig.Value;
             _toolDamage = _toolDamageConfig.Value;
             _spellDamage = _spellDamageConfig.Value;
             _summonDamage = _summonDamageConfig.Value;
-            
+
             _nailMultiplier = _nailMultiplierConfig.Value;
             _toolMultiplier = _toolMultiplierConfig.Value;
             _spellMultiplier = _spellMultiplierConfig.Value;
             _summonMultiplier = _summonMultiplierConfig.Value;
             _globalMultiplier = _globalMultiplierConfig.Value;
-            
+
             Plugin.Log.LogInfo("DamageSystem initialized");
         }
-        
+
         /// <summary>
         /// Calculate final damage for given type and base damage.
         /// Returns the modified damage value (can be negative for healing).
@@ -240,7 +278,7 @@ namespace SilksongManager.Damage
         {
             float damage = baseDamage;
             float multiplier = _globalMultiplier;
-            
+
             switch (type)
             {
                 case DamageType.Nail:
@@ -248,29 +286,29 @@ namespace SilksongManager.Damage
                         damage = _nailDamage;
                     multiplier *= _nailMultiplier;
                     break;
-                    
+
                 case DamageType.Tool:
                     if (_customToolEnabled)
                         damage = _toolDamage;
                     multiplier *= _toolMultiplier;
                     break;
-                    
+
                 case DamageType.Spell:
                     if (_customSpellEnabled)
                         damage = _spellDamage;
                     multiplier *= _spellMultiplier;
                     break;
-                    
+
                 case DamageType.Summon:
                     if (_customSummonEnabled)
                         damage = _summonDamage;
                     multiplier *= _summonMultiplier;
                     break;
             }
-            
+
             return damage * multiplier;
         }
-        
+
         /// <summary>
         /// Get custom damage value for type, or null if not enabled.
         /// </summary>
@@ -290,7 +328,7 @@ namespace SilksongManager.Damage
                     return null;
             }
         }
-        
+
         /// <summary>
         /// Check if custom damage is enabled for type.
         /// </summary>
@@ -305,7 +343,7 @@ namespace SilksongManager.Damage
                 default: return false;
             }
         }
-        
+
         /// <summary>
         /// Toggle custom damage for type.
         /// </summary>
@@ -327,7 +365,7 @@ namespace SilksongManager.Damage
                     break;
             }
         }
-        
+
         /// <summary>
         /// Set custom damage value for type.
         /// </summary>
@@ -341,7 +379,7 @@ namespace SilksongManager.Damage
                 case DamageType.Summon: SummonDamage = value; break;
             }
         }
-        
+
         /// <summary>
         /// Get damage value for type.
         /// </summary>
@@ -356,7 +394,7 @@ namespace SilksongManager.Damage
                 default: return 0;
             }
         }
-        
+
         /// <summary>
         /// Adjust damage value by delta.
         /// </summary>
@@ -364,7 +402,7 @@ namespace SilksongManager.Damage
         {
             SetDamage(type, GetDamage(type) + delta);
         }
-        
+
         /// <summary>
         /// Set multiplier for type.
         /// </summary>
@@ -378,7 +416,7 @@ namespace SilksongManager.Damage
                 case DamageType.Summon: SummonMultiplier = value; break;
             }
         }
-        
+
         /// <summary>
         /// Get multiplier for type.
         /// </summary>

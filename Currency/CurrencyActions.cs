@@ -3,13 +3,18 @@ using UnityEngine;
 namespace SilksongManager.Currency
 {
     /// <summary>
-    /// Actions related to currency management (Geo, Shards).
+    /// Actions related to currency management (Geo, Shell Shards).
+    /// Provides methods to add, set, and query player currency.
+    /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class CurrencyActions
     {
+        #region Geo Management
+
         /// <summary>
-        /// Add geo to the player.
+        /// Adds the specified amount of geo to the player.
         /// </summary>
+        /// <param name="amount">Amount of geo to add.</param>
         public static void AddGeo(int amount)
         {
             var pd = Plugin.PD;
@@ -25,8 +30,9 @@ namespace SilksongManager.Currency
         }
 
         /// <summary>
-        /// Set geo to specific amount.
+        /// Sets the player's geo to a specific amount.
         /// </summary>
+        /// <param name="amount">Target geo amount (minimum 0).</param>
         public static void SetGeo(int amount)
         {
             var pd = Plugin.PD;
@@ -37,8 +43,9 @@ namespace SilksongManager.Currency
         }
 
         /// <summary>
-        /// Take geo from the player.
+        /// Removes the specified amount of geo from the player.
         /// </summary>
+        /// <param name="amount">Amount of geo to remove.</param>
         public static void TakeGeo(int amount)
         {
             var pd = Plugin.PD;
@@ -48,9 +55,14 @@ namespace SilksongManager.Currency
             Plugin.Log.LogInfo($"Removed {amount} geo. Current: {pd.geo}");
         }
 
+        #endregion
+
+        #region Shell Shards Management
+
         /// <summary>
-        /// Add shell shards to the player.
+        /// Adds shell shards to the player.
         /// </summary>
+        /// <param name="amount">Number of shards to add.</param>
         public static void AddShards(int amount)
         {
             var pd = Plugin.PD;
@@ -61,8 +73,9 @@ namespace SilksongManager.Currency
         }
 
         /// <summary>
-        /// Set shell shards to specific amount.
+        /// Sets shell shards to a specific amount.
         /// </summary>
+        /// <param name="amount">Target shard count (minimum 0).</param>
         public static void SetShards(int amount)
         {
             var pd = Plugin.PD;
@@ -72,9 +85,14 @@ namespace SilksongManager.Currency
             Plugin.Log.LogInfo($"Set shards to {pd.ShellShards}");
         }
 
+        #endregion
+
+        #region Currency Query
+
         /// <summary>
-        /// Get current currency info.
+        /// Gets the current currency information.
         /// </summary>
+        /// <returns>CurrencyInfo struct with current geo and shard counts.</returns>
         public static CurrencyInfo GetCurrencyInfo()
         {
             var pd = Plugin.PD;
@@ -89,14 +107,18 @@ namespace SilksongManager.Currency
                 ShellShards = pd.ShellShards
             };
         }
+
+        #endregion
     }
 
     /// <summary>
-    /// Currency information.
+    /// Currency information data structure.
     /// </summary>
     public struct CurrencyInfo
     {
+        /// <summary>Current geo amount.</summary>
         public int Geo;
+        /// <summary>Current shell shard count.</summary>
         public int ShellShards;
     }
 }

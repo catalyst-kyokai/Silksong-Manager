@@ -10,20 +10,33 @@ namespace SilksongManager.DebugMenu.Windows
     /// </summary>
     public class EnemiesWindow : BaseWindow
     {
+        #region Window Properties
+
         public override int WindowId => 10004;
         public override string Title => "Enemies";
         protected override Vector2 DefaultSize => new Vector2(300, 400);
 
+        #endregion
+
+        #region Private Fields
+
+        /// <summary>Scroll position for enemy list.</summary>
         private Vector2 _enemyListScroll;
+        /// <summary>Cached enemy data for performance.</summary>
         private List<Enemies.EnemyInfo> _cachedEnemies;
+        /// <summary>Timer for cache refresh.</summary>
         private float _cacheTimer = 0f;
+        /// <summary>Interval between cache refreshes.</summary>
         private const float CACHE_INTERVAL = 0.5f;
+
+        #endregion
+
+        #region Update
 
         public override void Update()
         {
             base.Update();
 
-            // Cache enemies periodically for performance
             _cacheTimer += Time.unscaledDeltaTime;
             if (_cacheTimer >= CACHE_INTERVAL)
             {
@@ -32,9 +45,12 @@ namespace SilksongManager.DebugMenu.Windows
             }
         }
 
+        #endregion
+
+        #region Drawing Methods
+
         protected override void DrawContent()
         {
-            // Quick actions
             DebugMenuStyles.DrawSectionHeader("ACTIONS");
 
             GUILayout.BeginHorizontal();
@@ -54,14 +70,12 @@ namespace SilksongManager.DebugMenu.Windows
             DrawKeybindHint(ModAction.FreezeEnemies);
             GUILayout.EndHorizontal();
 
-            // Stats
             DebugMenuStyles.DrawSectionHeader("STATS");
 
             int enemyCount = _cachedEnemies?.Count ?? 0;
             GUILayout.Label($"Enemies in room: {enemyCount}", DebugMenuStyles.Label);
             DebugMenuStyles.DrawStatus("Frozen", isFrozen);
 
-            // Enemy List
             DebugMenuStyles.DrawSectionHeader("ENEMY LIST");
 
             if (_cachedEnemies == null || _cachedEnemies.Count == 0)
@@ -79,7 +93,6 @@ namespace SilksongManager.DebugMenu.Windows
 
                     GUILayout.BeginHorizontal();
 
-                    // Enemy name (truncated if too long)
                     string name = enemy.Name;
                     if (name.Length > 18) name = name.Substring(0, 15) + "...";
 
@@ -89,7 +102,7 @@ namespace SilksongManager.DebugMenu.Windows
                     if (GUILayout.Button("Kill", DebugMenuStyles.ButtonSmall, GUILayout.Width(40)))
                     {
                         Enemies.EnemyActions.KillEnemy(i);
-                        _cachedEnemies = Enemies.EnemyActions.FindAllEnemies(); // Refresh
+                        _cachedEnemies = Enemies.EnemyActions.FindAllEnemies();
                     }
 
                     GUILayout.EndHorizontal();
@@ -98,12 +111,15 @@ namespace SilksongManager.DebugMenu.Windows
                 GUILayout.EndScrollView();
             }
 
-            // Refresh button
             if (GUILayout.Button("Refresh List", DebugMenuStyles.Button))
             {
                 _cachedEnemies = Enemies.EnemyActions.FindAllEnemies();
             }
         }
+
+        #endregion
+
+        #region Helpers
 
         private void DrawKeybindHint(ModAction action)
         {
@@ -113,6 +129,7 @@ namespace SilksongManager.DebugMenu.Windows
                 GUILayout.Label($"[{DebugMenuStyles.KeyCodeToString(key)}]", DebugMenuStyles.Label, GUILayout.Width(50));
             }
         }
+
+        #endregion
     }
 }
-

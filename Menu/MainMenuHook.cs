@@ -11,14 +11,26 @@ namespace SilksongManager.Menu
 {
     /// <summary>
     /// Hooks into the main menu to add the SS Manager button and menu screen.
+    /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class MainMenuHook
     {
+        #region Private Fields
+
+        /// <summary>Whether the hook has been initialized.</summary>
         private static bool _initialized = false;
+        /// <summary>The SS Manager button game object.</summary>
         private static GameObject _ssManagerButton;
+        /// <summary>The mod menu screen.</summary>
         private static MenuScreen _modMenuScreen;
+        /// <summary>Controller for input handling.</summary>
         private static ModMenuController _menuController;
+        /// <summary>Whether we are currently in mod menu.</summary>
         private static bool _isInModMenu = false;
+
+        #endregion
+
+        #region Initialization
 
         /// <summary>
         /// Initialize the main menu hook. Called when menu scene loads.
@@ -29,7 +41,7 @@ namespace SilksongManager.Menu
 
             try
             {
-                var mainMenuOptions = Object.FindObjectOfType<MainMenuOptions>();
+                var mainMenuOptions = Object.FindAnyObjectByType<MainMenuOptions>();
                 if (mainMenuOptions == null)
                 {
                     Plugin.Log.LogWarning("MainMenuOptions not found - not in menu scene?");
@@ -60,6 +72,10 @@ namespace SilksongManager.Menu
             _menuController = null;
             _isInModMenu = false;
         }
+
+        #endregion
+
+        #region Button Creation
 
         private static void CreateSSManagerButton(MainMenuOptions mainMenuOptions)
         {
@@ -383,6 +399,8 @@ namespace SilksongManager.Menu
 
             ui.StartCoroutine(FadeInCanvasGroup(ui.mainMenuScreen, ui));
         }
+
+        #endregion
 
         #region UI Transition Helpers (mimicking UIManager methods)
 

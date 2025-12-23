@@ -14,33 +14,47 @@ namespace SilksongManager.DebugMenu
     /// </summary>
     public class DebugMenuController : MonoBehaviour
     {
-        private bool _isVisible = false;
-        private bool _previousCursorVisible;
-        private CursorLockMode _previousCursorLockState;
-        private float _previousTimeScale = 1f;
-        private bool _pausedByUs = false;  // Track if WE paused the game
+        #region Private Fields
 
-        // Reflection cache for cursor fix
+        /// <summary>Whether the debug menu is currently visible.</summary>
+        private bool _isVisible = false;
+        /// <summary>Previous cursor visibility state.</summary>
+        private bool _previousCursorVisible;
+        /// <summary>Previous cursor lock state.</summary>
+        private CursorLockMode _previousCursorLockState;
+        /// <summary>Previous time scale.</summary>
+        private float _previousTimeScale = 1f;
+        /// <summary>Tracks if we paused the game.</summary>
+        private bool _pausedByUs = false;
+
+        /// <summary>Cached field for cursor fix via reflection.</summary>
         private static FieldInfo _controllerPressedField;
+        /// <summary>Whether reflection has been initialized.</summary>
         private static bool _reflectionInitialized = false;
 
+        /// <summary>List of all debug windows.</summary>
         private List<BaseWindow> _windows;
+        /// <summary>Reference to the main window.</summary>
         private MainWindow _mainWindow;
+
+        #endregion
+
+        #region Properties
 
         /// <summary>
         /// Whether the debug menu is currently open.
         /// </summary>
         public bool IsVisible => _isVisible;
 
+        #endregion
+
+        #region Unity Lifecycle
+
         private void Awake()
         {
-            // Initialize config
             DebugMenuConfig.Initialize(Plugin.ModConfig.ConfigFile);
-
-            // Initialize reflection for cursor fix
             InitializeReflection();
 
-            // Create windows (they will load their saved states)
             _windows = new List<BaseWindow>();
 
             _mainWindow = new MainWindow(this);
@@ -88,7 +102,6 @@ namespace SilksongManager.DebugMenu
 
         private void Update()
         {
-            // Update all windows (for keybind checks)
             foreach (var window in _windows)
             {
                 window.Update();
@@ -97,24 +110,24 @@ namespace SilksongManager.DebugMenu
 
         private void LateUpdate()
         {
-            // Force cursor visibility every frame while menu is open
             if (_isVisible)
             {
                 ForceCursorVisible();
             }
         }
 
+        #endregion
+
+        #region Cursor Control
+
         /// <summary>
         /// Force the cursor to be visible by manipulating game's internal state.
         /// </summary>
         private void ForceCursorVisible()
         {
-            // Method 1: Direct cursor control
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
 
-            // Method 2: Set _controllerPressed = false via reflection
-            // This makes InputHandler.SetCursorVisible(!_controllerPressed) show cursor
             try
             {
                 if (_controllerPressedField != null)
@@ -124,7 +137,6 @@ namespace SilksongManager.DebugMenu
             }
             catch { }
 
-            // Method 3: Enable UI mouse input
             try
             {
                 var uiManager = UIManager.instance;
@@ -136,23 +148,28 @@ namespace SilksongManager.DebugMenu
             catch { }
         }
 
+        #endregion
+
+        #region OnGUI
+
         private void OnGUI()
         {
             if (!_isVisible) return;
 
-            // Force cursor visible during OnGUI as well
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
 
-            // Ensure styles are initialized
             DebugMenuStyles.EnsureInitialized();
 
-            // Draw all visible windows
             foreach (var window in _windows)
             {
                 window.Draw();
             }
         }
+
+        #endregion
+
+        #region Menu Visibility
 
         /// <summary>
         /// Toggle the menu visibility.
@@ -178,15 +195,12 @@ namespace SilksongManager.DebugMenu
 
             _isVisible = true;
 
-            // Save states
             _previousCursorVisible = Cursor.visible;
             _previousCursorLockState = Cursor.lockState;
             _previousTimeScale = Time.timeScale;
 
-            // Force cursor visible
             ForceCursorVisible();
 
-            // Pause game if option enabled
             if (DebugMenuConfig.PauseGameOnMenu)
             {
                 _pausedByUs = true;
@@ -197,17 +211,14 @@ namespace SilksongManager.DebugMenu
                 _pausedByUs = false;
             }
 
-            // Restore all windows to their saved visibility states
             foreach (var window in _windows)
             {
-                // Main window always shows, others restore their saved state
                 if (window == _mainWindow)
                 {
                     window.IsVisible = true;
                 }
                 else
                 {
-                    // Load saved visibility from config
                     var state = DebugMenuConfig.GetWindowState(window.WindowId);
                     window.IsVisible = state.IsVisible;
                 }
@@ -225,34 +236,34 @@ namespace SilksongManager.DebugMenu
 
             _isVisible = false;
 
-            // Save all window states BEFORE hiding (to preserve current visibility)
             foreach (var window in _windows)
             {
                 window.SaveState();
             }
 
-            // Restore cursor state
             Cursor.visible = _previousCursorVisible;
             Cursor.lockState = _previousCursorLockState;
 
-            // Restore time scale if WE paused it
             if (_pausedByUs && Time.timeScale == 0f)
             {
                 Time.timeScale = _previousTimeScale > 0f ? _previousTimeScale : 1f;
                 _pausedByUs = false;
             }
 
-            // Hide all windows WITHOUT saving (already saved above)
             foreach (var window in _windows)
             {
-                window.IsVisible = false;  // Just set visibility, don't call Hide() which saves
+                window.IsVisible = false;
             }
 
             Plugin.Log.LogInfo("Debug menu closed");
         }
 
+        #endregion
+
+        #region Window Access
+
         /// <summary>
-        /// Get a window by type.
+        /// Gets a window by type.
         /// </summary>
         public T GetWindow<T>() where T : BaseWindow
         {
@@ -271,6 +282,8 @@ namespace SilksongManager.DebugMenu
         {
             GetWindow<T>()?.Toggle();
         }
+
+        #endregion
     }
 }
 

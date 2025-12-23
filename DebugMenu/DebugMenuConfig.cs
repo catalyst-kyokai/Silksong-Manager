@@ -10,16 +10,28 @@ namespace SilksongManager.DebugMenu
     /// </summary>
     public static class DebugMenuConfig
     {
+        #region Private Fields
+
+        /// <summary>Reference to config file.</summary>
         private static ConfigFile _config;
+        /// <summary>Background opacity setting.</summary>
         private static ConfigEntry<float> _backgroundOpacity;
+        /// <summary>Full menu opacity setting.</summary>
         private static ConfigEntry<float> _fullMenuOpacity;
+        /// <summary>Opacity mode setting.</summary>
         private static ConfigEntry<OpacityMode> _opacityMode;
+        /// <summary>Pause game on menu setting.</summary>
         private static ConfigEntry<bool> _pauseGameOnMenu;
 
-        // Window state storage
+        /// <summary>Window state storage dictionary.</summary>
         private static Dictionary<int, ConfigEntry<string>> _windowStates = new Dictionary<int, ConfigEntry<string>>();
 
+        /// <summary>Whether config has been initialized.</summary>
         private static bool _initialized = false;
+
+        #endregion
+
+        #region Enums
 
         public enum OpacityMode
         {
@@ -27,6 +39,14 @@ namespace SilksongManager.DebugMenu
             FullMenu
         }
 
+        #endregion
+
+        #region Initialization
+
+        /// <summary>
+        /// Initializes the debug menu configuration.
+        /// </summary>
+        /// <param name="config">BepInEx configuration file.</param>
         public static void Initialize(ConfigFile config)
         {
             if (_initialized) return;
@@ -63,7 +83,9 @@ namespace SilksongManager.DebugMenu
             _initialized = true;
         }
 
-        // Accessors
+        #endregion
+
+        #region Public Properties
         public static float BackgroundOpacity
         {
             get => _backgroundOpacity?.Value ?? 0.9f;
@@ -103,6 +125,8 @@ namespace SilksongManager.DebugMenu
         {
             return BackgroundOpacity;
         }
+
+        #endregion
 
         #region Window State Persistence
 

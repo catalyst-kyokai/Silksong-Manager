@@ -4,12 +4,23 @@ namespace SilksongManager.Player
 {
     /// <summary>
     /// Actions related to the player/hero character.
+    /// Provides methods for health, silk, position, and ability management.
+    /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class PlayerActions
     {
+        #region State Fields
+
+        /// <summary>Legacy field for infinite jumps toggle.</summary>
         private static bool _infiniteJumpsEnabled = false;
+        /// <summary>Legacy field for noclip toggle.</summary>
         private static bool _noclipEnabled = false;
+        /// <summary>Saved position for teleportation.</summary>
         private static Vector3 _savedPosition = Vector3.zero;
+
+        #endregion
+
+        #region Quick Actions
 
         /// <summary>
         /// Heal the player to full health.
@@ -92,6 +103,10 @@ namespace SilksongManager.Player
             Plugin.Log.LogInfo($"Set health to {pd.health}");
         }
 
+        #endregion
+
+        #region Max Stats
+
         /// <summary>
         /// Set player max health.
         /// </summary>
@@ -122,14 +137,17 @@ namespace SilksongManager.Player
         public static void ToggleInfiniteJumps()
         {
             _infiniteJumpsEnabled = !_infiniteJumpsEnabled;
-            // Note: Actual implementation depends on game's ability system
             Plugin.Log.LogInfo($"Infinite Jumps: {(_infiniteJumpsEnabled ? "ON" : "OFF")}");
         }
 
         /// <summary>
-        /// Check if infinite jumps is enabled.
+        /// Gets whether infinite jumps is enabled (legacy).
         /// </summary>
         public static bool IsInfiniteJumpsEnabled => _infiniteJumpsEnabled;
+
+        #endregion
+
+        #region Noclip
 
         /// <summary>
         /// Toggle noclip mode.
@@ -197,6 +215,10 @@ namespace SilksongManager.Player
             rb.linearVelocity = new Vector2(h * speed, v * speed);
         }
 
+        #endregion
+
+        #region Teleportation
+
         /// <summary>
         /// Teleport player to a specific position.
         /// </summary>
@@ -243,6 +265,10 @@ namespace SilksongManager.Player
             Plugin.Log.LogInfo("Respawning player.");
         }
 
+        #endregion
+
+        #region State Query
+
         /// <summary>
         /// Get current player state info.
         /// </summary>
@@ -279,12 +305,12 @@ namespace SilksongManager.Player
         /// </summary>
         public static void UnlockAllAbilities()
         {
-            // Note: Silksong uses a different ability system than Hollow Knight
-            // Abilities may be unlocked through ToolItemManager or other systems
             ToolItemManager.UnlockAllTools();
             ToolItemManager.UnlockAllCrests();
             Plugin.Log.LogInfo("Unlocked all tools and crests.");
         }
+
+        #endregion
     }
 
     /// <summary>

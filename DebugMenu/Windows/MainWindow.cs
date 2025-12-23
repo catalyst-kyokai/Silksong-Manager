@@ -9,36 +9,46 @@ namespace SilksongManager.DebugMenu.Windows
     /// </summary>
     public class MainWindow : BaseWindow
     {
+        #region Window Properties
+
         public override int WindowId => 10001;
         public override string Title => "Silksong Manager";
         protected override Vector2 DefaultSize => new Vector2(320, 420);
 
+        #endregion
+
+        #region Private Fields
+
+        /// <summary>Reference to the debug menu controller.</summary>
         private DebugMenuController _controller;
+
+        #endregion
+
+        #region Constructor
 
         public MainWindow(DebugMenuController controller) : base()
         {
             _controller = controller;
-            // Base constructor calls LoadState() which loads position/size/visibility from config
         }
+
+        #endregion
+
+        #region Drawing Methods
 
         protected override void DrawContent()
         {
-            // Status section
             DrawStatusSection();
 
             GUILayout.Space(8);
 
-            // Quick actions
             DrawQuickActions();
 
             GUILayout.Space(8);
 
-            // Window buttons
             DrawWindowButtons();
 
             GUILayout.FlexibleSpace();
 
-            // Footer
             DrawFooter();
         }
 
@@ -51,19 +61,16 @@ namespace SilksongManager.DebugMenu.Windows
 
             if (pd != null && hero != null)
             {
-                // Health
                 GUILayout.BeginHorizontal();
                 GUILayout.Label($"Health: {pd.health}/{pd.maxHealth}", DebugMenuStyles.Label);
                 GUILayout.FlexibleSpace();
                 GUILayout.Label($"Silk: {pd.silk}/{pd.silkMax}", DebugMenuStyles.Label);
                 GUILayout.EndHorizontal();
 
-                // Geo
                 GUILayout.Label($"Geo: {pd.geo}", DebugMenuStyles.Label);
 
                 GUILayout.Space(4);
 
-                // Toggles status
                 DebugMenuStyles.DrawStatus("Invincibility", pd.isInvincible);
                 DebugMenuStyles.DrawStatus("Noclip", Player.CheatSystem.NoclipEnabled);
             }
@@ -113,7 +120,6 @@ namespace SilksongManager.DebugMenu.Windows
         {
             DebugMenuStyles.DrawSectionHeader("WINDOWS");
 
-            // 2-column layout for window buttons
             GUILayout.BeginHorizontal();
             GUILayout.BeginVertical();
 
@@ -189,9 +195,10 @@ namespace SilksongManager.DebugMenu.Windows
 
         protected override void DrawHeader()
         {
-            // Custom header without close button (main window stays open)
             GUILayout.Label(Title, DebugMenuStyles.Header);
             DebugMenuStyles.DrawSeparator();
         }
+
+        #endregion
     }
 }

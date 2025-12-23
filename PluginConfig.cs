@@ -3,55 +3,117 @@ using BepInEx.Configuration;
 namespace SilksongManager
 {
     /// <summary>
-    /// Configuration settings for the plugin.
+    /// Configuration settings for the Silksong Manager plugin.
+    /// Manages all persistent settings through BepInEx configuration system.
+    /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public class PluginConfig
     {
+        #region Private Fields
+
+        /// <summary>
+        /// Reference to the BepInEx configuration file.
+        /// </summary>
         private readonly ConfigFile _config;
 
         /// <summary>
-        /// Exposes the raw ConfigFile for other modules.
+        /// Configuration entry for enabling hotkeys.
+        /// </summary>
+        private ConfigEntry<bool> _enableHotkeys;
+
+        /// <summary>
+        /// Configuration entry for showing debug info overlay.
+        /// </summary>
+        private ConfigEntry<bool> _showDebugInfo;
+
+        /// <summary>
+        /// Configuration entry for enabling logging.
+        /// </summary>
+        private ConfigEntry<bool> _enableLogging;
+
+        #endregion
+
+        #region Public Properties
+
+        /// <summary>
+        /// Exposes the raw ConfigFile for use by other modules.
         /// </summary>
         public ConfigFile ConfigFile => _config;
 
-        // Config entries with backing
-        private ConfigEntry<bool> _enableHotkeys;
-        private ConfigEntry<bool> _showDebugInfo;
-        private ConfigEntry<bool> _enableLogging;
-
-        // General Settings - now with public setters
+        /// <summary>
+        /// Gets or sets whether keyboard hotkeys are enabled for quick actions.
+        /// </summary>
         public bool EnableHotkeys
         {
             get => _enableHotkeys?.Value ?? true;
             set { if (_enableHotkeys != null) _enableHotkeys.Value = value; }
         }
 
+        /// <summary>
+        /// Gets or sets whether to show debug information overlay on screen.
+        /// </summary>
         public bool ShowDebugInfo
         {
             get => _showDebugInfo?.Value ?? false;
             set { if (_showDebugInfo != null) _showDebugInfo.Value = value; }
         }
 
+        /// <summary>
+        /// Gets or sets whether logging to BepInEx console is enabled.
+        /// </summary>
         public bool EnableLogging
         {
             get => _enableLogging?.Value ?? true;
             set { if (_enableLogging != null) _enableLogging.Value = value; }
         }
 
-        // Debug Menu Settings (read-only)
+        /// <summary>
+        /// Gets the configured width of the debug menu window.
+        /// </summary>
         public float MenuWidth { get; private set; }
+
+        /// <summary>
+        /// Gets the configured height of the debug menu window.
+        /// </summary>
         public float MenuHeight { get; private set; }
+
+        /// <summary>
+        /// Gets the configured font size for debug menu text.
+        /// </summary>
         public int FontSize { get; private set; }
 
+        #endregion
+
+        #region Constructor
+
+        /// <summary>
+        /// Initializes a new instance of PluginConfig with the given configuration file.
+        /// </summary>
+        /// <param name="config">The BepInEx configuration file.</param>
         public PluginConfig(ConfigFile config)
         {
             _config = config;
             LoadConfig();
         }
 
+        #endregion
+
+        #region Configuration Loading
+
+        /// <summary>
+        /// Loads all configuration entries from the configuration file.
+        /// </summary>
         private void LoadConfig()
         {
-            // General Settings
+            LoadGeneralSettings();
+            LoadDebugMenuSettings();
+        }
+
+        /// <summary>
+        /// Loads general plugin settings.
+        /// </summary>
+        private void LoadGeneralSettings()
+        {
             _enableHotkeys = _config.Bind(
                 "General",
                 "EnableHotkeys",
@@ -72,8 +134,13 @@ namespace SilksongManager
                 true,
                 "Enable logging to BepInEx console"
             );
+        }
 
-            // Debug Menu Settings
+        /// <summary>
+        /// Loads debug menu appearance settings.
+        /// </summary>
+        private void LoadDebugMenuSettings()
+        {
             MenuWidth = _config.Bind(
                 "DebugMenu",
                 "MenuWidth",
@@ -95,6 +162,7 @@ namespace SilksongManager
                 "Font size for debug menu text"
             ).Value;
         }
+
+        #endregion
     }
 }
-

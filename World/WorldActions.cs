@@ -4,13 +4,24 @@ using System.Collections.Generic;
 namespace SilksongManager.World
 {
     /// <summary>
-    /// Actions related to world/scene management.
+    /// Actions related to world and scene management.
+    /// Provides methods for position saving, scene transitions, and game speed control.
+    /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class WorldActions
     {
+        #region State Fields
+
+        /// <summary>Saved position for teleportation.</summary>
         private static Vector3 _savedPosition = Vector3.zero;
+        /// <summary>Scene name where position was saved.</summary>
         private static string _savedScene = "";
+        /// <summary>List of visited scenes.</summary>
         private static List<string> _visitedScenes = new List<string>();
+
+        #endregion
+
+        #region Position Management
 
         /// <summary>
         /// Save current position.
@@ -54,6 +65,10 @@ namespace SilksongManager.World
             return Plugin.GM?.sceneName ?? "Unknown";
         }
 
+        #endregion
+
+        #region Scene Transition
+
         /// <summary>
         /// Transition to another scene.
         /// </summary>
@@ -83,12 +98,34 @@ namespace SilksongManager.World
         /// <summary>
         /// Reload current scene.
         /// </summary>
-        public static void ReloadCurrentScene()
+        /// <returns>The scene name that was reloaded.</returns>
+        public static string ReloadCurrentScene()
         {
             var sceneName = GetCurrentSceneName();
-            if (sceneName == "Unknown") return;
+            if (sceneName == "Unknown") return null;
 
             TransitionToScene(sceneName);
+            return sceneName;
+        }
+
+        /// <summary>
+        /// Respawn the player at the last respawn point.
+        /// </summary>
+        public static void Respawn()
+        {
+            var gm = Plugin.GM;
+            if (gm == null)
+            {
+                Plugin.Log.LogWarning("Cannot respawn: GameManager not available.");
+                return;
+            }
+
+            // Use HazardRespawn for a clean respawn
+            if (Plugin.Hero != null)
+            {
+                Plugin.Hero.StartCoroutine(Plugin.Hero.HazardRespawn());
+                Plugin.Log.LogInfo("Player respawned.");
+            }
         }
 
         /// <summary>
@@ -109,6 +146,10 @@ namespace SilksongManager.World
                 IsGamePaused = gm.IsGamePaused()
             };
         }
+
+        #endregion
+
+        #region Game Speed Control
 
         /// <summary>
         /// Pause the game.
@@ -136,6 +177,8 @@ namespace SilksongManager.World
             Time.timeScale = Mathf.Clamp(speed, 0f, 10f);
             Plugin.Log.LogInfo($"Game speed set to {Time.timeScale}x");
         }
+
+        #endregion
     }
 
     /// <summary>

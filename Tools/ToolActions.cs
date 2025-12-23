@@ -6,15 +6,17 @@ namespace SilksongManager.Tools
 {
     /// <summary>
     /// Actions related to tools and crests management.
+    /// Provides methods to unlock, list, and replenish tools and crests.
+    /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class ToolActions
     {
+        #region Unlock Methods
         /// <summary>
         /// Unlock all tools.
         /// </summary>
         public static void UnlockAllTools()
         {
-            // UnlockAllTools is a static method on ToolItemManager
             ToolItemManager.UnlockAllTools();
             Plugin.Log.LogInfo("Unlocked all tools.");
         }
@@ -24,10 +26,13 @@ namespace SilksongManager.Tools
         /// </summary>
         public static void UnlockAllCrests()
         {
-            // UnlockAllCrests is a static method on ToolItemManager
             ToolItemManager.UnlockAllCrests();
             Plugin.Log.LogInfo("Unlocked all crests.");
         }
+
+        #endregion
+
+        #region Query Methods
 
         /// <summary>
         /// Get list of all tools.
@@ -35,8 +40,6 @@ namespace SilksongManager.Tools
         public static List<ToolInfo> GetAllTools()
         {
             var result = new List<ToolInfo>();
-
-            // GetAllTools is a static method
             var tools = ToolItemManager.GetAllTools();
             foreach (var tool in tools)
             {
@@ -59,8 +62,6 @@ namespace SilksongManager.Tools
         public static List<ToolInfo> GetUnlockedTools()
         {
             var result = new List<ToolInfo>();
-
-            // GetUnlockedTools is a static method
             var tools = ToolItemManager.GetUnlockedTools();
             foreach (var tool in tools)
             {
@@ -83,8 +84,6 @@ namespace SilksongManager.Tools
         public static List<CrestInfo> GetAllCrests()
         {
             var result = new List<CrestInfo>();
-
-            // GetAllCrests is a static method
             var crests = ToolItemManager.GetAllCrests();
             foreach (var crest in crests)
             {
@@ -101,15 +100,20 @@ namespace SilksongManager.Tools
             return result;
         }
 
+        #endregion
+
+        #region Replenish Methods
+
         /// <summary>
-        /// Replenish all tools (at bench).
+        /// Replenishes all tools (at bench).
         /// </summary>
         public static void ReplenishAllTools()
         {
-            // TryReplenishTools is a static method with (bool doReplenish, ReplenishMethod method)
             ToolItemManager.TryReplenishTools(true, ToolItemManager.ReplenishMethod.Bench);
             Plugin.Log.LogInfo("Replenished all tools.");
         }
+
+        #endregion
     }
 
     /// <summary>

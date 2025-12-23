@@ -4,16 +4,25 @@ using UnityEngine;
 namespace SilksongManager.Enemies
 {
     /// <summary>
-    /// Actions related to enemy management.
+    /// Actions related to enemy management and manipulation.
+    /// Provides methods to find, kill, freeze, and damage enemies.
+    /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class EnemyActions
     {
+        #region State
+
+        /// <summary>Tracks whether enemies are currently frozen.</summary>
         private static bool _enemiesFrozen = false;
 
         /// <summary>
-        /// Whether enemies are currently frozen.
+        /// Gets whether enemies are currently frozen.
         /// </summary>
         public static bool AreEnemiesFrozen => _enemiesFrozen;
+
+        #endregion
+
+        #region Query Methods
 
         /// <summary>
         /// Get count of enemies in current scene.
@@ -73,6 +82,10 @@ namespace SilksongManager.Enemies
             return result;
         }
 
+        #endregion
+
+        #region Kill Methods
+
         /// <summary>
         /// Kill all enemies in current scene.
         /// </summary>
@@ -110,6 +123,10 @@ namespace SilksongManager.Enemies
 
             Plugin.Log.LogInfo($"Dealt {damage} damage to all enemies.");
         }
+
+        #endregion
+
+        #region Freeze Methods
 
         /// <summary>
         /// Freeze all enemies.
@@ -184,6 +201,8 @@ namespace SilksongManager.Enemies
                 }
             }
         }
+
+        #endregion
     }
 
     /// <summary>

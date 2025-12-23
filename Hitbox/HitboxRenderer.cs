@@ -4,16 +4,29 @@ using GlobalEnums;
 
 namespace SilksongManager.Hitbox
 {
+    /// <summary>
+    /// MonoBehaviour responsible for rendering hitbox visualizations on screen.
+    /// Uses Unity's IMGUI system to draw collider outlines based on layer configuration.
+    /// Author: Catalyst (catalyst@kyokai.ru)
+    /// </summary>
     public class HitboxRenderer : MonoBehaviour
     {
+        /// <summary>List of colliders currently visible within camera bounds.</summary>
         private List<Collider2D> _visibleColliders = new List<Collider2D>();
+        /// <summary>Reference to the main camera for world-to-screen coordinate conversion.</summary>
         private Camera _cam;
 
+        /// <summary>
+        /// Unity Start callback - initializes camera reference.
+        /// </summary>
         private void Start()
         {
             _cam = Camera.main;
         }
 
+        /// <summary>
+        /// Unity Update callback - refreshes visible colliders list when hitbox visualization is enabled.
+        /// </summary>
         private void Update()
         {
             if (!HitboxConfig.ShowHitboxes) return;
@@ -23,6 +36,9 @@ namespace SilksongManager.Hitbox
             UpdateVisibleColliders();
         }
 
+        /// <summary>
+        /// Collects all colliders within the camera's visible area using Physics2D.OverlapAreaAll.
+        /// </summary>
         private void UpdateVisibleColliders()
         {
             _visibleColliders.Clear();
@@ -30,7 +46,7 @@ namespace SilksongManager.Hitbox
             // Calculate camera bounds in world space
             float height = 2f * _cam.orthographicSize;
             float width = height * _cam.aspect;
-            
+
             // Add a small buffer to ensure we catch edge items
             Vector2 camPos = _cam.transform.position;
             Vector2 size = new Vector2(width, height) * 1.1f;
@@ -41,6 +57,9 @@ namespace SilksongManager.Hitbox
             _visibleColliders.AddRange(hits);
         }
 
+        /// <summary>
+        /// Unity OnGUI callback - draws hitbox outlines for all visible colliders.
+        /// </summary>
         private void OnGUI()
         {
             if (!HitboxConfig.ShowHitboxes) return;
@@ -59,6 +78,11 @@ namespace SilksongManager.Hitbox
             }
         }
 
+        /// <summary>
+        /// Determines the hitbox layer category for a given collider based on physics layer and properties.
+        /// </summary>
+        /// <param name="col">The collider to classify.</param>
+        /// <returns>The HitboxLayer enum value representing the collider's category.</returns>
         private HitboxLayer ClassifyCollider(Collider2D col)
         {
             // Cache these lookups if optimization is needed, but layer checks are fast
@@ -73,14 +97,19 @@ namespace SilksongManager.Hitbox
             if (layer == (int)PhysLayers.ACTIVE_REGION) return HitboxLayer.Trigger;
 
             if (col.isTrigger) return HitboxLayer.Trigger;
-            
+
             // Fallbacks based on components
             // Using string checks to avoid hard dependnecy on game types if possible, but this is a mod so we can assume assembly presence
             // However, sticking to layers is faster. 
-            
-            return HitboxLayer.Terrain; 
+
+            return HitboxLayer.Terrain;
         }
 
+        /// <summary>
+        /// Checks if a given hitbox layer should be displayed based on current configuration.
+        /// </summary>
+        /// <param name="layer">The hitbox layer to check.</param>
+        /// <returns>True if the layer is configured to be shown.</returns>
         private bool ShouldShow(HitboxLayer layer)
         {
             switch (layer)
@@ -97,6 +126,11 @@ namespace SilksongManager.Hitbox
             }
         }
 
+        /// <summary>
+        /// Gets the configured color for a given hitbox layer.
+        /// </summary>
+        /// <param name="layer">The hitbox layer to get color for.</param>
+        /// <returns>The Color configured for this layer type.</returns>
         private Color GetColor(HitboxLayer layer)
         {
             switch (layer)
@@ -113,6 +147,11 @@ namespace SilksongManager.Hitbox
             }
         }
 
+        /// <summary>
+        /// Dispatches collider drawing to the appropriate method based on collider type.
+        /// </summary>
+        /// <param name="col">The collider to draw.</param>
+        /// <param name="color">The color to use for the outline.</param>
         private void DrawCollider(Collider2D col, Color color)
         {
             if (col is BoxCollider2D box)
@@ -133,18 +172,28 @@ namespace SilksongManager.Hitbox
             }
         }
 
+        /// <summary>
+        /// Converts a world space position to GUI screen coordinates.
+        /// </summary>
+        /// <param name="worldPos">Position in world space.</param>
+        /// <returns>Position in GUI coordinates (origin top-left, Y increases downward).</returns>
         private Vector2 WorldToGUIPoint(Vector3 worldPos)
         {
             Vector3 screenPos = _cam.WorldToScreenPoint(worldPos);
             return new Vector2(screenPos.x, Screen.height - screenPos.y);
         }
 
+        /// <summary>
+        /// Draws a BoxCollider2D outline, accounting for object rotation and scale.
+        /// </summary>
+        /// <param name="box">The box collider to draw.</param>
+        /// <param name="color">The color of the outline.</param>
         private void DrawBoxCollider(BoxCollider2D box, Color color)
         {
             // BoxCollider2D is defined by offset and size in local space.
             // We need to transform the 4 corners to world space, then to GUI space.
             // Why 4 corners? Because the object might be rotated.
-            
+
             Vector2 offset = box.offset;
             Vector2 size = box.size;
 
@@ -171,33 +220,43 @@ namespace SilksongManager.Hitbox
             Drawing.DrawLine(s4, s1, color, HitboxConfig.LineThickness);
         }
 
+        /// <summary>
+        /// Draws a CircleCollider2D outline, accounting for object scale.
+        /// </summary>
+        /// <param name="circle">The circle collider to draw.</param>
+        /// <param name="color">The color of the outline.</param>
         private void DrawCircleCollider(CircleCollider2D circle, Color color)
         {
             Vector2 centerStart = circle.offset;
             Transform t = circle.transform;
             Vector2 worldCenter = t.TransformPoint(centerStart);
-            
+
             // Scale radius by max scale axis to handle non-uniform scale (approximate for ellipse if non-uniform)
             // But circle colliders in Unity 2D with non-uniform scale become ellipses. 
             // For simple viz, we can take one axis or try to draw ellipse.
             // Let's assume uniform or take X scale.
             float r = circle.radius * Mathf.Max(Mathf.Abs(t.lossyScale.x), Mathf.Abs(t.lossyScale.y));
-            
+
             // Draw as circle in world logic, but need to project
             // Simpler: Project center, project a point at radius, use distance as screen radius?
             // Only works for uniform camera. Ortho camera is uniform.
-            
+
             Vector2 screenCenter = WorldToGUIPoint(worldCenter);
             Vector3 worldRadiusPoint = worldCenter + new Vector2(r, 0);
             Vector2 screenRadiusPoint = WorldToGUIPoint(worldRadiusPoint);
             float screenRadius = Vector2.Distance(screenCenter, screenRadiusPoint);
 
             Drawing.DrawCircle(screenCenter, screenRadius, color, HitboxConfig.LineThickness);
-            
+
             // Orientation line?
             // Drawing.DrawLine(screenCenter, ...);
         }
 
+        /// <summary>
+        /// Draws a PolygonCollider2D outline for all paths in the collider.
+        /// </summary>
+        /// <param name="poly">The polygon collider to draw.</param>
+        /// <param name="color">The color of the outline.</param>
         private void DrawPolygonCollider(PolygonCollider2D poly, Color color)
         {
             Transform t = poly.transform;
@@ -208,15 +267,20 @@ namespace SilksongManager.Hitbox
                 {
                     Vector2 pA = path[j];
                     Vector2 pB = path[(j + 1) % path.Length];
-                    
+
                     Vector2 wA = t.TransformPoint(pA + poly.offset);
                     Vector2 wB = t.TransformPoint(pB + poly.offset);
-                    
+
                     Drawing.DrawLine(WorldToGUIPoint(wA), WorldToGUIPoint(wB), color, HitboxConfig.LineThickness);
                 }
             }
         }
 
+        /// <summary>
+        /// Draws an EdgeCollider2D as a series of connected line segments.
+        /// </summary>
+        /// <param name="edge">The edge collider to draw.</param>
+        /// <param name="color">The color of the outline.</param>
         private void DrawEdgeCollider(EdgeCollider2D edge, Color color)
         {
             Transform t = edge.transform;
@@ -226,11 +290,11 @@ namespace SilksongManager.Hitbox
             for (int i = 0; i < points.Length - 1; i++)
             {
                 Vector2 pA = points[i];
-                Vector2 pB = points[i+1];
-                
+                Vector2 pB = points[i + 1];
+
                 Vector2 wA = t.TransformPoint(pA + edge.offset);
                 Vector2 wB = t.TransformPoint(pB + edge.offset);
-                
+
                 Drawing.DrawLine(WorldToGUIPoint(wA), WorldToGUIPoint(wB), color, HitboxConfig.LineThickness);
             }
         }

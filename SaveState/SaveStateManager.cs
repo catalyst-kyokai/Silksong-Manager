@@ -17,16 +17,29 @@ using HutongGames.PlayMaker;
 
 namespace SilksongManager.SaveState
 {
+    /// <summary>
+    /// Manages save state functionality for capturing and restoring complete game state snapshots.
+    /// Supports saving player data, enemy states, battle/boss progress, and scene data.
+    /// Uses Harmony patches to intercept scene loading for proper state restoration.
+    /// Author: Catalyst (catalyst@kyokai.ru)
+    /// </summary>
     public static class SaveStateManager
     {
+        /// <summary>List of all captured save states.</summary>
         private static List<SaveStateData> _saveStates = new List<SaveStateData>();
+        /// <summary>Path to the JSON file storing save states.</summary>
         private static string _saveFilePath;
+        /// <summary>State pending to be loaded after scene transition.</summary>
         private static SaveStateData _pendingLoadState;
+        /// <summary>Harmony instance for scene loading patches.</summary>
         private static Harmony _harmony;
 
-        // Events
+        /// <summary>Event fired when save states list changes (add, delete).</summary>
         public static event Action OnStatesChanged;
 
+        /// <summary>
+        /// Initializes the save state system, loads existing states from disk, and applies Harmony patches.
+        /// </summary>
         public static void Initialize()
         {
             _saveFilePath = Path.Combine(Paths.ConfigPath, "SilksongManager_SaveStates.json");
@@ -40,11 +53,56 @@ namespace SilksongManager.SaveState
             );
         }
 
+        /// <summary>
+        /// Gets all captured save states.
+        /// </summary>
+        /// <returns>List of all save state data objects.</returns>
         public static List<SaveStateData> GetStates()
         {
             return _saveStates;
         }
 
+        /// <summary>
+        /// Gets the most recently created save state.
+        /// </summary>
+        /// <returns>The last save state, or null if no states exist.</returns>
+        public static SaveStateData GetLastState()
+        {
+            if (_saveStates.Count == 0) return null;
+            return _saveStates[_saveStates.Count - 1];
+        }
+
+        /// <summary>
+        /// Quick save with auto-generated name.
+        /// </summary>
+        /// <returns>The display name of the created state.</returns>
+        public static string QuickSave()
+        {
+            CaptureState(null);
+            var lastState = GetLastState();
+            return lastState?.GetDisplayName() ?? "Unknown";
+        }
+
+        /// <summary>
+        /// Loads the most recently created save state.
+        /// </summary>
+        /// <returns>The display name of the loaded state, or null if no states exist.</returns>
+        public static string LoadLastState()
+        {
+            var lastState = GetLastState();
+            if (lastState == null)
+            {
+                Plugin.Log.LogWarning("No save states available to load.");
+                return null;
+            }
+            LoadState(lastState);
+            return lastState.GetDisplayName();
+        }
+
+        /// <summary>
+        /// Captures the current game state into a new save state.
+        /// </summary>
+        /// <param name="name">Optional custom name for the save state.</param>
         public static void CaptureState(string name = null)
         {
             if (Plugin.PD == null || Plugin.Hero == null)
@@ -105,6 +163,10 @@ namespace SilksongManager.SaveState
             }
         }
 
+        /// <summary>
+        /// Loads a previously captured save state, restoring all game data.
+        /// </summary>
+        /// <param name="state">The save state to load.</param>
         public static void LoadState(SaveStateData state)
         {
             if (state == null) return;
@@ -240,7 +302,7 @@ namespace SilksongManager.SaveState
             try { RestorePersistentBoolItems(); } catch (Exception e) { Plugin.Log.LogError("Error restoring persistent items: " + e); }
 
             // Small delay to let FSMs initialize before applying enemy states
-            yield return new WaitForSeconds(0.2f);
+            yield return new WaitForSecondsRealtime(0.2f);
 
             // Restore Enemy & Scene States
             try { RestoreEnemyStates(state.EnemyStates); } catch (Exception e) { Plugin.Log.LogError("Error restoring enemies: " + e); }
@@ -256,46 +318,79 @@ namespace SilksongManager.SaveState
             // Apply Hero State
             ApplyStateImmediate(state);
 
-            // Handle Unpause unconditionally
+            // Handle Unpause unconditionally with defensive blocks
             Plugin.Log.LogInfo("[DEBUG] Force Unpausing Game...");
 
             // 1. Reset Game Manager Pause State
-            GameManager.instance.isPaused = false;
-            GameManager.instance.FadeSceneIn();
-            GameCameras.instance.ResumeCameraShake();
+            try
+            {
+                GameManager.instance.isPaused = false;
+            }
+            catch (Exception ex) { Plugin.Log.LogWarning("Failed to unpause GM: " + ex.Message); }
+
+            try { GameManager.instance.FadeSceneIn(); }
+            catch (Exception ex) { Plugin.Log.LogWarning("Failed to fade scene in: " + ex.Message); }
+
+            try { GameCameras.instance.ResumeCameraShake(); }
+            catch (Exception ex) { Plugin.Log.LogWarning("Failed to resume camera shake: " + ex.Message); }
 
             // 2. Unlock Input
-            if (GameManager.instance.inputHandler != null)
+            try
             {
-                GameManager.instance.inputHandler.StartAcceptingInput();
-                GameManager.instance.inputHandler.AllowPause();
+                if (GameManager.instance.inputHandler != null)
+                {
+                    GameManager.instance.inputHandler.StartAcceptingInput();
+                    GameManager.instance.inputHandler.AllowPause();
+                }
             }
+            catch (Exception ex) { Plugin.Log.LogWarning("Failed to unlock input: " + ex.Message); }
 
             // 3. Close Menus
-            var menuButtonListType = Assembly.GetAssembly(typeof(GameManager)).GetType("MenuButtonList");
-            if (menuButtonListType != null)
+            try
             {
-                var clearMethod = menuButtonListType.GetMethod("ClearAllLastSelected", BindingFlags.Public | BindingFlags.Static);
-                clearMethod?.Invoke(null, null);
+                var menuButtonListType = Assembly.GetAssembly(typeof(GameManager)).GetType("MenuButtonList");
+                if (menuButtonListType != null)
+                {
+                    var clearMethod = menuButtonListType.GetMethod("ClearAllLastSelected", BindingFlags.Public | BindingFlags.Static);
+                    clearMethod?.Invoke(null, null);
+                }
             }
+            catch (Exception ex) { Plugin.Log.LogWarning("Failed to clear menus: " + ex.Message); }
 
-            // 4. Force TimeScale = 1
+            // 4. Force TimeScale = 1 (CRITICAL: Must execute)
+            try
+            {
+                Time.timeScale = 1f;
+
+                // Reflection for TimeManager.TimeScale = 1f
+                var timeManagerType = Assembly.GetAssembly(typeof(GameManager)).GetType("TimeManager");
+                if (timeManagerType != null)
+                {
+                    var timeScaleProp = timeManagerType.GetProperty("TimeScale", BindingFlags.Public | BindingFlags.Static);
+                    timeScaleProp?.SetValue(null, 1f);
+                }
+            }
+            catch (Exception ex) { Plugin.Log.LogWarning("Failed to set TimeScale: " + ex.Message); }
+
+            Plugin.Log.LogInfo("[DEBUG] Unpause sequence completed");
+
+            // Final Physics Tap to ensure transforms sync
+            yield return new WaitForFixedUpdate();
+            Plugin.Hero.transform.position = state.Position;
+
+            // Restoring Time Scale and clearing pending state (CRITICAL for unfreezing)
             Time.timeScale = 1f;
+            _pendingLoadState = null;
 
-            // Reflection for TimeManager.TimeScale = 1f
-            var timeManagerType = Assembly.GetAssembly(typeof(GameManager)).GetType("TimeManager");
-            if (timeManagerType != null)
-            {
-                var timeScaleProp = timeManagerType.GetProperty("TimeScale", BindingFlags.Public | BindingFlags.Static);
-                timeScaleProp?.SetValue(null, 1f);
-            }
-
-            // Tail helper
-            yield return null;
+            Plugin.Log.LogInfo("Load complete!");
         }
 
 
 
+        /// <summary>
+        /// Deletes a save state from the list and persists changes to disk.
+        /// </summary>
+        /// <param name="state">The save state to delete.</param>
         public static void DeleteState(SaveStateData state)
         {
             if (_saveStates.Remove(state))

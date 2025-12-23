@@ -10,7 +10,14 @@ namespace SilksongManager.Patches
     /// </summary>
     public static class DamagePatches
     {
+        #region Fields
+
+        /// <summary>Harmony instance for patching.</summary>
         private static Harmony _harmony;
+
+        #endregion
+
+        #region Public Methods
 
         /// <summary>
         /// Apply all damage patches.
@@ -37,8 +44,13 @@ namespace SilksongManager.Patches
             _harmony?.UnpatchSelf();
         }
 
+        #endregion
+
+        #region Harmony Patches
+
         /// <summary>
         /// Prefix patch for HealthManager.TakeDamage to modify damage values.
+        /// Handles custom damage types, multipliers, and negative damage (healing).
         /// </summary>
         [HarmonyPatch(typeof(HealthManager), "TakeDamage")]
         [HarmonyPrefix]
@@ -46,36 +58,27 @@ namespace SilksongManager.Patches
         {
             try
             {
-                // Determine damage type from AttackType
                 DamageType? damageType = GetDamageType(hitInstance.AttackType);
 
                 if (damageType == null)
                     return;
 
-                // Check if any custom damage is enabled for this type
                 if (!DamageSystem.IsCustomEnabled(damageType.Value) &&
                     Mathf.Approximately(DamageSystem.GetMultiplier(damageType.Value), 1f) &&
                     Mathf.Approximately(DamageSystem.GlobalMultiplier, 1f))
                     return;
 
-                // Calculate modified damage
                 float baseDamage = hitInstance.DamageDealt;
                 float modifiedDamage = DamageSystem.CalculateFinalDamage(damageType.Value, baseDamage);
 
-                // Handle negative damage (healing)
                 if (modifiedDamage < 0)
                 {
-                    // Heal the enemy instead of damaging
                     int healAmount = Mathf.RoundToInt(-modifiedDamage);
                     __instance.hp += healAmount;
-                    hitInstance.DamageDealt = 0; // No actual damage
-
-                    // Optional: log healing
-                    // Plugin.Log.LogInfo($"Healed enemy for {healAmount} HP");
+                    hitInstance.DamageDealt = 0;
                 }
                 else
                 {
-                    // Apply modified damage
                     hitInstance.DamageDealt = Mathf.RoundToInt(modifiedDamage);
                 }
             }
@@ -85,21 +88,25 @@ namespace SilksongManager.Patches
             }
         }
 
+        #endregion
+
+        #region Helper Methods
+
         /// <summary>
-        /// Map AttackTypes to our DamageType enum.
+        /// Maps game AttackTypes to our DamageType enum.
         /// </summary>
+        /// <param name="attackType">The game's attack type.</param>
+        /// <returns>The corresponding DamageType, or null if not mapped.</returns>
         private static DamageType? GetDamageType(AttackTypes attackType)
         {
             switch (attackType)
             {
-                // Nail attacks
                 case AttackTypes.Nail:
                 case AttackTypes.NailBeam:
                 case AttackTypes.SharpShadow:
                 case AttackTypes.Generic:
                     return DamageType.Nail;
 
-                // Tool attacks (weapons equipped as tools)
                 case AttackTypes.Heavy:
                 case AttackTypes.Explosion:
                 case AttackTypes.Acid:
@@ -108,11 +115,9 @@ namespace SilksongManager.Patches
                 case AttackTypes.Hunter:
                     return DamageType.Tool;
 
-                // Spell attacks
                 case AttackTypes.Spell:
                     return DamageType.Spell;
 
-                // Summon/trap attacks
                 case AttackTypes.Trap:
                 case AttackTypes.Coal:
                     return DamageType.Summon;
@@ -121,5 +126,7 @@ namespace SilksongManager.Patches
                     return null;
             }
         }
+
+        #endregion
     }
 }

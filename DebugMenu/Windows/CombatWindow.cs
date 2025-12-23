@@ -9,40 +9,49 @@ namespace SilksongManager.DebugMenu.Windows
     /// </summary>
     public class CombatWindow : BaseWindow
     {
+        #region Window Properties
+
         public override int WindowId => 10009;
         public override string Title => "Combat";
         protected override Vector2 DefaultSize => new Vector2(320, 500);
 
-        // Input fields
+        #endregion
+
+        #region Private Fields
+
+        /// <summary>Nail damage input field.</summary>
         private string _nailInput = "5";
+        /// <summary>Tool damage input field.</summary>
         private string _toolInput = "10";
+        /// <summary>Spell damage input field.</summary>
         private string _spellInput = "15";
+        /// <summary>Summon damage input field.</summary>
         private string _summonInput = "8";
+        /// <summary>Global multiplier input field.</summary>
         private string _globalMultInput = "1";
+
+        #endregion
+
+        #region Drawing Methods
 
         protected override void DrawContent()
         {
-            // Nail Damage
             DrawDamageSection("NAIL DAMAGE", DamageType.Nail, ref _nailInput);
 
             GUILayout.Space(8);
 
-            // Tool Damage
             DrawDamageSection("TOOL DAMAGE", DamageType.Tool, ref _toolInput);
 
             GUILayout.Space(8);
 
-            // Spell Damage
             DrawDamageSection("SPELL DAMAGE", DamageType.Spell, ref _spellInput);
 
             GUILayout.Space(8);
 
-            // Summon Damage
             DrawDamageSection("SUMMON DAMAGE", DamageType.Summon, ref _summonInput);
 
             GUILayout.Space(12);
 
-            // Global Multiplier
             DrawGlobalMultiplier();
         }
 
@@ -54,7 +63,6 @@ namespace SilksongManager.DebugMenu.Windows
             float currentDamage = DamageSystem.GetDamage(type);
             float multiplier = DamageSystem.GetMultiplier(type);
 
-            // Enable toggle
             GUILayout.BeginHorizontal();
             if (DebugMenuStyles.DrawToggleButton(enabled ? "Custom ON" : "Custom OFF", enabled))
             {
@@ -64,7 +72,6 @@ namespace SilksongManager.DebugMenu.Windows
 
             if (enabled)
             {
-                // Damage value with +/- buttons
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Value:", DebugMenuStyles.Label, GUILayout.Width(50));
 
@@ -79,7 +86,6 @@ namespace SilksongManager.DebugMenu.Windows
                     inputField = DamageSystem.GetDamage(type).ToString("F1");
                 }
 
-                // Text field for direct input
                 string newInput = GUILayout.TextField(inputField, DebugMenuStyles.TextField, GUILayout.Width(60));
                 if (newInput != inputField)
                 {
@@ -102,7 +108,6 @@ namespace SilksongManager.DebugMenu.Windows
                 }
                 GUILayout.EndHorizontal();
 
-                // Multiplier
                 GUILayout.BeginHorizontal();
                 GUILayout.Label($"Mult: {multiplier:F2}x", DebugMenuStyles.Label, GUILayout.Width(80));
                 float newMult = GUILayout.HorizontalSlider(multiplier, -2f, 10f);
@@ -112,7 +117,6 @@ namespace SilksongManager.DebugMenu.Windows
                 }
                 GUILayout.EndHorizontal();
 
-                // Show final damage
                 float finalDamage = DamageSystem.CalculateFinalDamage(type, currentDamage);
                 Color color = finalDamage >= 0 ? DebugMenuStyles.StatusOn : DebugMenuStyles.StatusWarning;
                 var oldColor = GUI.color;
@@ -150,7 +154,6 @@ namespace SilksongManager.DebugMenu.Windows
             }
             GUILayout.EndHorizontal();
 
-            // Input field for exact value
             GUILayout.BeginHorizontal();
             GUILayout.Label("Exact:", DebugMenuStyles.Label, GUILayout.Width(50));
             string newInput = GUILayout.TextField(_globalMultInput, DebugMenuStyles.TextField, GUILayout.Width(60));
@@ -171,10 +174,11 @@ namespace SilksongManager.DebugMenu.Windows
             }
             GUILayout.EndHorizontal();
 
-            // Info
             GUILayout.Space(4);
             GUILayout.Label("Negative = Heal enemies", DebugMenuStyles.Label);
             GUILayout.Label("Zero = No damage", DebugMenuStyles.Label);
         }
+
+        #endregion
     }
 }

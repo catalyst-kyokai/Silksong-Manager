@@ -3,15 +3,24 @@ using SilksongManager.Hitbox;
 
 namespace SilksongManager.DebugMenu.Windows
 {
+    /// <summary>
+    /// Hitbox visualization control window.
+    /// Author: Catalyst (catalyst@kyokai.ru)
+    /// </summary>
     public class HitboxWindow : BaseWindow
     {
+        #region Window Properties
+
         public override int WindowId => 10010;
         public override string Title => "Hitbox Visualizer";
         protected override Vector2 DefaultSize => new Vector2(300, 480);
 
+        #endregion
+
+        #region Drawing Methods
+
         protected override void DrawContent()
         {
-            // Master Toggle
             DebugMenuStyles.DrawSectionHeader("GENERAL");
 
             bool isEnabled = HitboxConfig.ShowHitboxes;
@@ -49,10 +58,13 @@ namespace SilksongManager.DebugMenu.Windows
 
             GUILayout.BeginHorizontal();
 
-            // Color Swatch
             var originalColor = GUI.color;
             GUI.color = color;
-            GUILayout.Box("", GUILayout.Width(20), GUILayout.Height(20));
+
+            // Draw a solid colored square using whiteTexture
+            Rect colorRect = GUILayoutUtility.GetRect(20, 20, GUILayout.ExpandWidth(false));
+            GUI.DrawTexture(colorRect, Texture2D.whiteTexture);
+
             GUI.color = originalColor;
 
             GUILayout.Space(5);
@@ -111,5 +123,7 @@ namespace SilksongManager.DebugMenu.Windows
                 default: return Color.white;
             }
         }
+
+        #endregion
     }
 }

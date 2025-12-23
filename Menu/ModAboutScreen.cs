@@ -13,13 +13,29 @@ namespace SilksongManager.Menu
     /// </summary>
     public static class ModAboutScreen
     {
+        #region Private Fields
+
+        /// <summary>The about menu screen.</summary>
         private static MenuScreen _aboutScreen;
+        /// <summary>Whether the screen has been initialized.</summary>
         private static bool _initialized = false;
+        /// <summary>Whether the screen is currently active.</summary>
         private static bool _isActive = false;
+        /// <summary>Whether the screen is currently exiting.</summary>
         private static bool _isExiting = false;
 
+        #endregion
+
+        #region Public Properties
+
+        /// <summary>Whether the about screen is currently active.</summary>
         public static bool IsActive => _isActive;
+        /// <summary>Whether the about screen is currently exiting.</summary>
         public static bool IsExiting => _isExiting;
+
+        #endregion
+
+        #region Initialization
 
         public static void Initialize()
         {
@@ -37,12 +53,19 @@ namespace SilksongManager.Menu
             }
         }
 
+        /// <summary>
+        /// Resets the screen state.
+        /// </summary>
         public static void Reset()
         {
             _initialized = false;
             _aboutScreen = null;
             _isActive = false;
         }
+
+        #endregion
+
+        #region Screen Creation
 
         private static void CreateAboutScreen()
         {
@@ -60,7 +83,6 @@ namespace SilksongManager.Menu
                 return;
             }
 
-            // Clone the screen
             var screenObj = Object.Instantiate(templateScreen.gameObject, templateScreen.transform.parent);
             screenObj.name = "ModAboutScreen";
 
@@ -86,7 +108,6 @@ namespace SilksongManager.Menu
 
         private static void ModifyScreenContent(GameObject screenObj)
         {
-            // Save back button first
             MenuButton savedBackButton = null;
             if (_aboutScreen.backButton != null)
             {
@@ -95,7 +116,6 @@ namespace SilksongManager.Menu
                 savedBackButton.gameObject.SetActive(false);
             }
 
-            // Destroy all children except title and fleur
             var toDestroy = new System.Collections.Generic.List<GameObject>();
             Transform titleTransform = null;
 
@@ -124,7 +144,6 @@ namespace SilksongManager.Menu
                 Object.DestroyImmediate(obj);
             }
 
-            // Set title
             if (titleTransform != null)
             {
                 titleTransform.gameObject.SetActive(true);
@@ -134,7 +153,6 @@ namespace SilksongManager.Menu
                     textComp.text = "About";
             }
 
-            // Configure back button
             if (savedBackButton != null)
             {
                 savedBackButton.OnSubmitPressed = new UnityEvent();
@@ -154,17 +172,14 @@ namespace SilksongManager.Menu
                 _aboutScreen.defaultHighlight = savedBackButton;
             }
 
-            // Create about content
             CreateAboutContent(screenObj);
         }
 
         private static void CreateAboutContent(GameObject screenObj)
         {
-            // Find or create a text template
             var canvas = screenObj.GetComponentInParent<Canvas>();
             if (canvas == null) return;
 
-            // Create description text
             var descObj = new GameObject("DescriptionText");
             descObj.transform.SetParent(screenObj.transform, false);
 
@@ -197,13 +212,16 @@ for Hollow Knight: Silksong
             descRect.anchoredPosition = new Vector2(0, 30);
             descRect.sizeDelta = new Vector2(600, 400);
 
-            // Try to use a better font if available
             var existingText = screenObj.GetComponentInChildren<Text>(true);
             if (existingText != null && existingText.font != null)
             {
                 descText.font = existingText.font;
             }
         }
+
+        #endregion
+
+        #region Helpers
 
         private static void DestroyLocalization(GameObject obj)
         {
@@ -227,6 +245,10 @@ for Hollow Knight: Silksong
             MainMenuHook.ReturnFromAboutScreen();
         }
 
+        #endregion
+
+        #region Show/Hide
+
         public static IEnumerator Show(UIManager ui)
         {
             if (_aboutScreen == null) yield break;
@@ -234,13 +256,11 @@ for Hollow Knight: Silksong
             _isActive = true;
             _isExiting = false;
 
-            // IMPORTANT: Hide main menu like Keybinds does
             MainMenuHook.HideMainMenu(ui);
 
             var cg = _aboutScreen.GetComponent<CanvasGroup>();
             _aboutScreen.gameObject.SetActive(true);
 
-            // Add/enable input controller that keeps main menu hidden
             var inputController = _aboutScreen.gameObject.GetComponent<AboutInputController>();
             if (inputController == null)
             {
@@ -293,6 +313,8 @@ for Hollow Knight: Silksong
             _isActive = false;
             _isExiting = false;
         }
+
+        #endregion
     }
 
     /// <summary>
