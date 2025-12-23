@@ -294,6 +294,39 @@ namespace SilksongManager.SaveState
                 }
 
                 Plugin.Hero.AcceptInput();
+
+                // Force UIManager to game mode
+                try
+                {
+                    var uiManager = UnityEngine.Object.FindObjectOfType<UIManager>();
+                    if (uiManager != null)
+                    {
+                        // Reflection to set UIManager state
+                        var setUIModeMethod = uiManager.GetType().GetMethod("SetUIStartState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        setUIModeMethod?.Invoke(uiManager, new object[] { GameState.PLAYING });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.LogWarning("Failed to reset UIManager: " + ex.Message);
+                }
+
+                // Force InputHandler to accept input
+                try
+                {
+                    var inputHandler = GameManager.instance.inputHandler;
+                    if (inputHandler != null)
+                    {
+                        typeof(InputHandler).GetField("acceptingInput", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.SetValue(inputHandler, true);
+                        typeof(InputHandler).GetField("inputBlocked", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.SetValue(inputHandler, false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.LogWarning("Failed to reset InputHandler: " + ex.Message);
+                }
+
+                Plugin.Log.LogInfo("[DEBUG] Unpause sequence completed");
             }
 
             // Final Physics Tap
@@ -637,36 +670,45 @@ namespace SilksongManager.SaveState
 
         private static void RestorePersistentBoolItems()
         {
-            // PersistentBoolItems read from SceneData.PersistentBools in their Start() method
-            // SceneData was already restored before scene load, so items should have correct state
-            // However, we call PreSetup() to force re-read for any items that need it
+            // PersistentBoolItems already ran Start() during scene initialization
+            // BUT they may have loaded from OLD SceneData before we restored ours
+            // We need to FORCE them to re-read the restored SceneData values
 
             var persistentItems = UnityEngine.Object.FindObjectsOfType<PersistentBoolItem>();
             int restoredCount = 0;
             int trueCount = 0;
 
+            // Get the base PersistentItem<bool> type for reflection
+            var persistentItemType = typeof(PersistentBoolItem).BaseType; // PersistentItem<bool>
+            var startedField = persistentItemType?.GetField("started", BindingFlags.Instance | BindingFlags.NonPublic);
+            var hasSetupField = persistentItemType?.GetField("hasSetup", BindingFlags.Instance | BindingFlags.NonPublic);
+
             Plugin.Log.LogInfo($"[DEBUG] Found {persistentItems.Length} PersistentBoolItems to process");
+            Plugin.Log.LogInfo($"[DEBUG] startedField found: {startedField != null}, hasSetupField found: {hasSetupField != null}");
 
             foreach (var item in persistentItems)
             {
                 try
                 {
-                    // Check value before PreSetup
-                    bool hadValueBefore = item.HasLoadedValue;
-                    bool valueBefore = item.HasLoadedValue ? item.LoadedValue : false;
+                    // Get the item's ID and SceneName using public methods
+                    string id = item.GetId();
+                    string sceneName = item.GetSceneName();
 
-                    // PreSetup() calls Start() which re-reads from SceneData and triggers OnSetSaveState
-                    item.PreSetup();
+                    // If ID is empty, use game object name (matching EnsureSetup behavior)
+                    if (string.IsNullOrEmpty(id)) id = item.name;
+                    if (string.IsNullOrEmpty(sceneName)) sceneName = GameManager.GetBaseSceneName(item.gameObject.scene.name);
 
-                    // Check value after PreSetup
-                    bool hasValueAfter = item.HasLoadedValue;
-                    bool valueAfter = item.HasLoadedValue ? item.LoadedValue : false;
+                    // Check if SceneData has a TRUE value for this item
+                    bool savedValue = SceneData.instance.PersistentBools.GetValueOrDefault(sceneName, id);
 
-                    if (valueAfter) trueCount++;
+                    Plugin.Log.LogInfo($"[DEBUG] PersistentBoolItem '{item.name}' (scene={sceneName}, id={id}): SceneData value = {savedValue}");
 
-                    if (hadValueBefore != hasValueAfter || valueBefore != valueAfter)
+                    if (savedValue)
                     {
-                        Plugin.Log.LogInfo($"[DEBUG] PersistentBoolItem '{item.name}' changed: {valueBefore} -> {valueAfter}");
+                        // Force the value by calling SetValueOverride which triggers callbacks
+                        item.SetValueOverride(true);
+                        trueCount++;
+                        Plugin.Log.LogInfo($"[DEBUG] Applied SetValueOverride(true) to '{item.name}'");
                     }
 
                     restoredCount++;
@@ -677,7 +719,7 @@ namespace SilksongManager.SaveState
                 }
             }
 
-            Plugin.Log.LogInfo($"[DEBUG] Restored {restoredCount} PersistentBoolItems, {trueCount} had true value");
+            Plugin.Log.LogInfo($"[DEBUG] Restored {restoredCount} PersistentBoolItems, {trueCount} had true value in SceneData");
         }
 
         private static void RestoreBattleSceneState(BattleSceneStateData data)
