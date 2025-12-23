@@ -257,92 +257,44 @@ namespace SilksongManager.SaveState
             ApplyStateImmediate(state);
 
             // Handle Unpause unconditionally
-            // if (GameManager.instance.isPaused) // Do it always to be safe
+            Plugin.Log.LogInfo("[DEBUG] Force Unpausing Game...");
+
+            // 1. Reset Game Manager Pause State
+            GameManager.instance.isPaused = false;
+            GameManager.instance.FadeSceneIn();
+            GameCameras.instance.ResumeCameraShake();
+
+            // 2. Unlock Input
+            if (GameManager.instance.inputHandler != null)
             {
-                GameManager.instance.FadeSceneIn();
-                GameManager.instance.isPaused = false;
-                GameCameras.instance.ResumeCameraShake();
-                Plugin.Hero.UnPause();
-
-                // Reflection for MenuButtonList.ClearAllLastSelected()
-                var menuButtonListType = Assembly.GetAssembly(typeof(GameManager)).GetType("MenuButtonList");
-                if (menuButtonListType != null)
-                {
-                    var clearMethod = menuButtonListType.GetMethod("ClearAllLastSelected", BindingFlags.Public | BindingFlags.Static);
-                    clearMethod?.Invoke(null, null);
-                }
-
-                // Reflection for TimeManager.TimeScale = 1f
-                var timeManagerType = Assembly.GetAssembly(typeof(GameManager)).GetType("TimeManager");
-                if (timeManagerType != null)
-                {
-                    var timeScaleProp = timeManagerType.GetProperty("TimeScale", BindingFlags.Public | BindingFlags.Static);
-                    timeScaleProp?.SetValue(null, 1f);
-                }
-
-                // Fallback direct Time.timeScale
-                Time.timeScale = 1f;
-
-                // Force GameState to PLAYING via Reflection
-                try
-                {
-                    var setStateMethod = typeof(GameManager).GetMethod("SetState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (setStateMethod != null)
-                    {
-                        setStateMethod.Invoke(GameManager.instance, new object[] { GameState.PLAYING });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Plugin.Log.LogError("Failed to force GameState: " + ex.Message);
-                }
-
-                Plugin.Hero.AcceptInput();
-
-                // Force UIManager to game mode
-                try
-                {
-                    var uiManager = UnityEngine.Object.FindObjectOfType<UIManager>();
-                    if (uiManager != null)
-                    {
-                        // Reflection to set UIManager state
-                        var setUIModeMethod = uiManager.GetType().GetMethod("SetUIStartState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                        setUIModeMethod?.Invoke(uiManager, new object[] { GameState.PLAYING });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Plugin.Log.LogWarning("Failed to reset UIManager: " + ex.Message);
-                }
-
-                // Force InputHandler to accept input
-                try
-                {
-                    var inputHandler = GameManager.instance.inputHandler;
-                    if (inputHandler != null)
-                    {
-                        typeof(InputHandler).GetField("acceptingInput", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.SetValue(inputHandler, true);
-                        typeof(InputHandler).GetField("inputBlocked", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.SetValue(inputHandler, false);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Plugin.Log.LogWarning("Failed to reset InputHandler: " + ex.Message);
-                }
-
-                Plugin.Log.LogInfo("[DEBUG] Unpause sequence completed");
+                GameManager.instance.inputHandler.StartAcceptingInput();
+                GameManager.instance.inputHandler.AllowPause();
             }
 
-            // Final Physics Tap
-            yield return new WaitForFixedUpdate();
-            Plugin.Hero.transform.position = state.Position;
+            // 3. Close Menus
+            var menuButtonListType = Assembly.GetAssembly(typeof(GameManager)).GetType("MenuButtonList");
+            if (menuButtonListType != null)
+            {
+                var clearMethod = menuButtonListType.GetMethod("ClearAllLastSelected", BindingFlags.Public | BindingFlags.Static);
+                clearMethod?.Invoke(null, null);
+            }
 
-            // Time Scale back
+            // 4. Force TimeScale = 1
             Time.timeScale = 1f;
-            _pendingLoadState = null;
 
-            Plugin.Log.LogInfo("Load complete!");
+            // Reflection for TimeManager.TimeScale = 1f
+            var timeManagerType = Assembly.GetAssembly(typeof(GameManager)).GetType("TimeManager");
+            if (timeManagerType != null)
+            {
+                var timeScaleProp = timeManagerType.GetProperty("TimeScale", BindingFlags.Public | BindingFlags.Static);
+                timeScaleProp?.SetValue(null, 1f);
+            }
+
+            // Tail helper
+            yield return null;
         }
+
+
 
         public static void DeleteState(SaveStateData state)
         {
