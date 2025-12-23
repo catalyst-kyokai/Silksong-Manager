@@ -676,32 +676,33 @@ namespace SilksongManager.SaveState
         {
             // The game only persists PersistentBoolItem states on scene exit
             // We need to force them to save their current state to SceneData NOW before we serialize it
+            // IMPORTANT: UpdateValue() only updates itemData.Value, but SaveStateNoCondition() actually calls SaveValue()
+            // which writes to SceneData.PersistentBools!
 
             var persistentItems = UnityEngine.Object.FindObjectsOfType<PersistentBoolItem>();
-            var updateValueMethod = typeof(PersistentBoolItem).BaseType?.GetMethod("UpdateValue", BindingFlags.Instance | BindingFlags.NonPublic);
+            // SaveStateNoCondition is public - no need for reflection!
 
-            Plugin.Log.LogInfo($"[DEBUG] ForceSavePersistentItems: Found {persistentItems.Length} items, UpdateValue method: {updateValueMethod != null}");
+            Plugin.Log.LogInfo($"[DEBUG] ForceSavePersistentItems: Found {persistentItems.Length} items");
 
             int savedCount = 0;
             foreach (var item in persistentItems)
             {
                 try
                 {
-                    // Call UpdateValue() to force the item to persist its current state
-                    if (updateValueMethod != null)
-                    {
-                        updateValueMethod.Invoke(item, null);
-                        savedCount++;
+                    // Call SaveStateNoCondition() which:
+                    // 1. Calls OnGetSaveState or UpdateActivatedFromFSM to get current value
+                    // 2. Calls SaveValue(itemData) to actually write to SceneData.PersistentBools!
+                    item.SaveStateNoCondition();
+                    savedCount++;
 
-                        // Log the value that was saved
-                        string id = item.GetId();
-                        string sceneName = item.GetSceneName();
-                        if (string.IsNullOrEmpty(id)) id = item.name;
-                        if (string.IsNullOrEmpty(sceneName)) sceneName = GameManager.GetBaseSceneName(item.gameObject.scene.name);
+                    // Log the value that was saved
+                    string id = item.GetId();
+                    string sceneName = item.GetSceneName();
+                    if (string.IsNullOrEmpty(id)) id = item.name;
+                    if (string.IsNullOrEmpty(sceneName)) sceneName = GameManager.GetBaseSceneName(item.gameObject.scene.name);
 
-                        bool savedValue = SceneData.instance.PersistentBools.GetValueOrDefault(sceneName, id);
-                        Plugin.Log.LogInfo($"[DEBUG] Saved '{item.name}' (scene={sceneName}, id={id}) = {savedValue}");
-                    }
+                    bool savedValue = SceneData.instance.PersistentBools.GetValueOrDefault(sceneName, id);
+                    Plugin.Log.LogInfo($"[DEBUG] Saved '{item.name}' (scene={sceneName}, id={id}) = {savedValue}");
                 }
                 catch (Exception e)
                 {
