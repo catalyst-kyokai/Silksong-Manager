@@ -500,6 +500,12 @@ namespace SilksongManager.SaveState
                     data.FsmStates.Add(CaptureFsmState(fsm));
                 }
 
+                // Capture child object active states (for cocoons, effects, etc.)
+                foreach (Transform child in enemy.transform)
+                {
+                    data.ChildObjectStates[child.name] = child.gameObject.activeSelf;
+                }
+
                 enemyStates.Add(data);
             }
 
@@ -630,58 +636,17 @@ namespace SilksongManager.SaveState
                     }
                 }
 
-                // Debug: Log boss hierarchy to find cocoon control
-                if (state.GameObjectName.Contains("Mother") || state.GameObjectName.Contains("Boss"))
+                // Restore child object active states (for cocoons, effects, etc.)
+                if (state.ChildObjectStates != null && state.ChildObjectStates.Count > 0)
                 {
-                    Plugin.Log.LogInfo($"[DEBUG] === Boss Hierarchy for '{state.GameObjectName}' ===");
-
-                    // Log all child GameObjects
                     foreach (Transform child in enemy.transform)
                     {
-                        Plugin.Log.LogInfo($"[DEBUG] Child: '{child.name}' active={child.gameObject.activeSelf}");
-
-                        // Check for SpriteRenderer
-                        var sr = child.GetComponent<SpriteRenderer>();
-                        if (sr != null)
+                        if (state.ChildObjectStates.TryGetValue(child.name, out bool isActive))
                         {
-                            Plugin.Log.LogInfo($"[DEBUG]   -> SpriteRenderer: enabled={sr.enabled}, color.a={sr.color.a}");
-                        }
-
-                        // Check for Animator
-                        var anim = child.GetComponent<Animator>();
-                        if (anim != null)
-                        {
-                            Plugin.Log.LogInfo($"[DEBUG]   -> Animator: enabled={anim.enabled}, layer0StateHash={anim.GetCurrentAnimatorStateInfo(0).shortNameHash}");
-                        }
-
-                        // Check for PlayMakerFSM
-                        var childFsms = child.GetComponents<PlayMakerFSM>();
-                        foreach (var childFsm in childFsms)
-                        {
-                            Plugin.Log.LogInfo($"[DEBUG]   -> FSM '{childFsm.FsmName}' state='{childFsm.ActiveStateName}'");
+                            child.gameObject.SetActive(isActive);
                         }
                     }
-
-                    // Log main object components
-                    var mainAnim = enemy.GetComponent<Animator>();
-                    if (mainAnim != null)
-                    {
-                        Plugin.Log.LogInfo($"[DEBUG] Main Animator: enabled={mainAnim.enabled}, currentState={mainAnim.GetCurrentAnimatorStateInfo(0).shortNameHash}");
-                    }
-
-                    var mainSr = enemy.GetComponent<SpriteRenderer>();
-                    if (mainSr != null)
-                    {
-                        Plugin.Log.LogInfo($"[DEBUG] Main SpriteRenderer: enabled={mainSr.enabled}, color.a={mainSr.color.a}");
-                    }
-
-                    // Log all FSMs on main object
-                    foreach (var fsm in fsms)
-                    {
-                        Plugin.Log.LogInfo($"[DEBUG] Main FSM '{fsm.FsmName}' state='{fsm.ActiveStateName}'");
-                    }
-
-                    Plugin.Log.LogInfo($"[DEBUG] === End Boss Hierarchy ===");
+                    Plugin.Log.LogInfo($"[DEBUG] Restored active state for {state.ChildObjectStates.Count} child objects on {state.GameObjectName}");
                 }
 
                 if (state.IsDead)

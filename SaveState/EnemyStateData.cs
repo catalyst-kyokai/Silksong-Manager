@@ -34,5 +34,8 @@ namespace SilksongManager.SaveState
 
         // FSM states - list of all FSMs on this enemy
         public List<FsmStateData> FsmStates = new List<FsmStateData>();
+
+        // Child object active states - for restoring visual state (cocoons, effects, etc.)
+        public Dictionary<string, bool> ChildObjectStates = new Dictionary<string, bool>();
     }
 }
