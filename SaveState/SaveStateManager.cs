@@ -182,8 +182,8 @@ namespace SilksongManager.SaveState
                 JsonConvert.PopulateObject(state.SceneDataJson, SceneData.instance);
             }
 
-            // Reset transitions and semi-persistent items
-            GameManager.instance.ResetSemiPersistentItems();
+            // Reset transitions only (NOT semi-persistent items - we want to keep our restored data)
+            // GameManager.instance.ResetSemiPersistentItems(); // REMOVED - this was clearing SceneData
             StaticVariableList.ClearSceneTransitions();
 
             // 4. Load Destination Scene
@@ -235,6 +235,12 @@ namespace SilksongManager.SaveState
             try { RestoreEnemyStates(state.EnemyStates); } catch (Exception e) { Plugin.Log.LogError("Error restoring enemies: " + e); }
             try { RestoreBattleSceneState(state.BattleSceneState); } catch (Exception e) { Plugin.Log.LogError("Error restoring battle: " + e); }
             try { RestoreBossSceneState(state.BossSceneState); } catch (Exception e) { Plugin.Log.LogError("Error restoring boss: " + e); }
+
+            // Trigger battle/boss events to close arena gates if needed
+            if (state.BattleSceneState != null || state.BossSceneState != null)
+            {
+                PlayMakerFSM.BroadcastEvent("BATTLE START");
+            }
 
             // Apply Hero State
             ApplyStateImmediate(state);
@@ -624,61 +630,28 @@ namespace SilksongManager.SaveState
 
         private static void RestorePersistentBoolItems()
         {
-            // Re-trigger PersistentBoolItem evaluation from SceneData
+            // PersistentBoolItems read from SceneData.PersistentBools in their Start() method
+            // SceneData was already restored before scene load, so items should have correct state
+            // However, we call PreSetup() to force re-read for any items that need it
+
             var persistentItems = UnityEngine.Object.FindObjectsOfType<PersistentBoolItem>();
+            int restoredCount = 0;
+
             foreach (var item in persistentItems)
             {
                 try
                 {
-                    // PersistentBoolItem reads from SceneData in Awake
-                    // We can force re-read by calling SetValueOverride with current SceneData value
-                    // This triggers the OnSetSaveState event which handles disabling broken objects
-
-                    // Use reflection to get the item's ID and SceneName
-                    var itemDataField = typeof(PersistentBoolItem).GetField("itemData", BindingFlags.Instance | BindingFlags.NonPublic);
-                    if (itemDataField != null)
-                    {
-                        var itemData = itemDataField.GetValue(item);
-                        if (itemData != null)
-                        {
-                            var itemType = itemData.GetType();
-
-                            // Get ID
-                            string id = null;
-                            var idProp = itemType.GetProperty("ID");
-                            if (idProp != null) id = idProp.GetValue(itemData)?.ToString();
-                            else
-                            {
-                                var idField = itemType.GetField("ID");
-                                if (idField != null) id = idField.GetValue(itemData)?.ToString();
-                            }
-
-                            // Get SceneName
-                            string sceneName = null;
-                            var sceneProp = itemType.GetProperty("SceneName");
-                            if (sceneProp != null) sceneName = sceneProp.GetValue(itemData)?.ToString();
-                            else
-                            {
-                                var sceneField = itemType.GetField("SceneName");
-                                if (sceneField != null) sceneName = sceneField.GetValue(itemData)?.ToString();
-                            }
-
-                            if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(sceneName))
-                            {
-                                bool savedValue = SceneData.instance.PersistentBools.GetValueOrDefault(sceneName, id);
-                                if (savedValue)
-                                {
-                                    item.SetValueOverride(true);
-                                }
-                            }
-                        }
-                    }
+                    // PreSetup() calls Start() which re-reads from SceneData and triggers OnSetSaveState
+                    item.PreSetup();
+                    restoredCount++;
                 }
                 catch (Exception e)
                 {
                     Plugin.Log.LogWarning($"Failed to restore persistent item {item.name}: {e.Message}");
                 }
             }
+
+            Plugin.Log.LogInfo($"Restored {restoredCount} PersistentBoolItems");
         }
 
         private static void RestoreBattleSceneState(BattleSceneStateData data)
