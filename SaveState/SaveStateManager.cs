@@ -953,6 +953,13 @@ namespace SilksongManager.SaveState
 
             obj.SetActive(data.IsActive);
 
+            if (data.Transform != null)
+            {
+                obj.transform.localPosition = data.Transform.LocalPosition;
+                obj.transform.localRotation = data.Transform.LocalRotation;
+                obj.transform.localScale = data.Transform.LocalScale;
+            }
+
             if (data.SpriteRenderer != null)
             {
                 var sr = obj.GetComponent<SpriteRenderer>();
@@ -994,6 +1001,13 @@ namespace SilksongManager.SaveState
         {
             var data = new ObjectComponentData();
             data.IsActive = obj.activeSelf;
+
+            data.Transform = new TransformData
+            {
+                LocalPosition = obj.transform.localPosition,
+                LocalRotation = obj.transform.localRotation,
+                LocalScale = obj.transform.localScale
+            };
 
             var sr = obj.GetComponent<SpriteRenderer>();
             if (sr != null)

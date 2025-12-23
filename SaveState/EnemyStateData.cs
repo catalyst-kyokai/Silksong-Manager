@@ -30,12 +30,21 @@ namespace SilksongManager.SaveState
     }
 
     [System.Serializable]
+    public class TransformData
+    {
+        public Vector3 LocalPosition;
+        public Quaternion LocalRotation;
+        public Vector3 LocalScale;
+    }
+
+    [System.Serializable]
     public class ObjectComponentData
     {
         public bool IsActive; // GameObject active state
         public SpriteRendererData SpriteRenderer;
         public AnimatorData Animator;
         public ColliderData Collider2D; // Generic for any Collider2D
+        public TransformData Transform;
     }
 
     [System.Serializable]
