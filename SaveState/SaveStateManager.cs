@@ -650,6 +650,26 @@ namespace SilksongManager.SaveState
                 foreach (var kvp in data.StringVariables) { fsm.FsmVariables.GetFsmString(kvp.Key).Value = kvp.Value; varCount++; }
                 foreach (var kvp in data.Vector3Variables) { fsm.FsmVariables.GetFsmVector3(kvp.Key).Value = kvp.Value; varCount++; }
                 Plugin.Log.LogInfo($"[DEBUG] Restored {varCount} FSM variables");
+
+                // For Control FSMs (bosses/enemies), ensure Spawned is true if it exists
+                // The Spawned variable controls whether the enemy is visible (vs in cocoon)
+                if (fsm.FsmName == "Control")
+                {
+                    var spawnedVar = fsm.FsmVariables.GetFsmBool("Spawned");
+                    if (spawnedVar != null)
+                    {
+                        Plugin.Log.LogInfo($"[DEBUG] Found 'Spawned' variable, current={spawnedVar.Value}, forcing to true");
+                        spawnedVar.Value = true;
+                    }
+
+                    // Also ensure "Done First Spawn" is true
+                    var doneFirstSpawn = fsm.FsmVariables.GetFsmBool("Done First Spawn");
+                    if (doneFirstSpawn != null && !doneFirstSpawn.Value)
+                    {
+                        Plugin.Log.LogInfo($"[DEBUG] Found 'Done First Spawn' variable, current={doneFirstSpawn.Value}, forcing to true");
+                        doneFirstSpawn.Value = true;
+                    }
+                }
             }
 
             if (!string.IsNullOrEmpty(data.ActiveStateName))
