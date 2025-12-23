@@ -38,10 +38,28 @@ namespace SilksongManager.SaveState
     }
 
     [System.Serializable]
+    public class MeshRendererData
+    {
+        public bool Enabled;
+        public string SortingLayerName;
+        public int SortingOrder;
+    }
+
+    [System.Serializable]
+    public class SkinnedMeshRendererData
+    {
+        public bool Enabled;
+        public string SortingLayerName;
+        public int SortingOrder;
+    }
+
+    [System.Serializable]
     public class ObjectComponentData
     {
         public bool IsActive; // GameObject active state
         public SpriteRendererData SpriteRenderer;
+        public MeshRendererData MeshRenderer;
+        public SkinnedMeshRendererData SkinnedMeshRenderer;
         public AnimatorData Animator;
         public ColliderData Collider2D; // Generic for any Collider2D
         public TransformData Transform;

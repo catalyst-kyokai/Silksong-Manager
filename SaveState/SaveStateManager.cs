@@ -972,6 +972,28 @@ namespace SilksongManager.SaveState
                 }
             }
 
+            if (data.MeshRenderer != null)
+            {
+                var mr = obj.GetComponent<MeshRenderer>();
+                if (mr != null)
+                {
+                    mr.enabled = data.MeshRenderer.Enabled;
+                    mr.sortingOrder = data.MeshRenderer.SortingOrder;
+                    mr.sortingLayerName = data.MeshRenderer.SortingLayerName;
+                }
+            }
+
+            if (data.SkinnedMeshRenderer != null)
+            {
+                var smr = obj.GetComponent<SkinnedMeshRenderer>();
+                if (smr != null)
+                {
+                    smr.enabled = data.SkinnedMeshRenderer.Enabled;
+                    smr.sortingOrder = data.SkinnedMeshRenderer.SortingOrder;
+                    smr.sortingLayerName = data.SkinnedMeshRenderer.SortingLayerName;
+                }
+            }
+
             if (data.Animator != null)
             {
                 var anim = obj.GetComponent<Animator>();
@@ -1022,6 +1044,28 @@ namespace SilksongManager.SaveState
                 };
             }
 
+            var mr = obj.GetComponent<MeshRenderer>();
+            if (mr != null)
+            {
+                data.MeshRenderer = new MeshRendererData
+                {
+                    Enabled = mr.enabled,
+                    SortingLayerName = mr.sortingLayerName,
+                    SortingOrder = mr.sortingOrder
+                };
+            }
+
+            var smr = obj.GetComponent<SkinnedMeshRenderer>();
+            if (smr != null)
+            {
+                data.SkinnedMeshRenderer = new SkinnedMeshRendererData
+                {
+                    Enabled = smr.enabled,
+                    SortingLayerName = smr.sortingLayerName,
+                    SortingOrder = smr.sortingOrder
+                };
+            }
+
             var anim = obj.GetComponent<Animator>();
             if (anim != null && anim.runtimeAnimatorController != null)
             {
@@ -1050,6 +1094,8 @@ namespace SilksongManager.SaveState
             {
                 string log = $"[DEBUG] Captured '{obj.name}': active={data.IsActive}";
                 if (data.SpriteRenderer != null) log += $", SR[en={data.SpriteRenderer.Enabled}, sort={data.SpriteRenderer.SortingOrder}, sprite={data.SpriteRenderer.SpriteName}]";
+                if (data.MeshRenderer != null) log += $", MR[en={data.MeshRenderer.Enabled}, sort={data.MeshRenderer.SortingOrder}]";
+                if (data.SkinnedMeshRenderer != null) log += $", SMR[en={data.SkinnedMeshRenderer.Enabled}, sort={data.SkinnedMeshRenderer.SortingOrder}]";
                 if (data.Animator != null) log += $", Anim[en={data.Animator.Enabled}, hash={data.Animator.StateHash}]";
                 if (data.Collider2D != null) log += $", Col[en={data.Collider2D.Enabled}]";
                 Plugin.Log.LogInfo(log);
