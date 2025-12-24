@@ -249,8 +249,8 @@ namespace SilksongManager.Player
 
             float speed = 15f;
 
-            // Check for shift (both left and right) for speed boost
-            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+            // Check for noclip speed boost keybind (customizable in mod settings)
+            if (Menu.Keybinds.ModKeybindManager.IsKeyHeld(Menu.Keybinds.ModAction.NoclipSpeedBoost))
                 speed = 30f;
 
             // Use game's input system to respect user's keybindings

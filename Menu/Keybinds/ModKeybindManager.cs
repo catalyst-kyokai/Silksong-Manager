@@ -12,6 +12,7 @@ namespace SilksongManager.Menu.Keybinds
     {
         ToggleDebugMenu,
         ToggleNoclip,
+        NoclipSpeedBoost,
         ToggleInvincibility,
         ToggleInfiniteJumps,
         ToggleInfiniteHealth,
@@ -60,6 +61,7 @@ namespace SilksongManager.Menu.Keybinds
         {
             { ModAction.ToggleDebugMenu, KeyCode.Keypad5 },
             { ModAction.ToggleNoclip, KeyCode.N },
+            { ModAction.NoclipSpeedBoost, KeyCode.LeftShift },
             { ModAction.ToggleInvincibility, KeyCode.I },
             { ModAction.ToggleInfiniteJumps, KeyCode.J },
             { ModAction.ToggleInfiniteHealth, KeyCode.None },
@@ -89,6 +91,7 @@ namespace SilksongManager.Menu.Keybinds
         {
             { ModAction.ToggleDebugMenu, "Debug Menu" },
             { ModAction.ToggleNoclip, "Noclip" },
+            { ModAction.NoclipSpeedBoost, "Noclip Speed Boost" },
             { ModAction.ToggleInvincibility, "Invincibility" },
             { ModAction.ToggleInfiniteJumps, "Infinite Jumps" },
             { ModAction.ToggleInfiniteHealth, "Infinite Health" },
@@ -246,6 +249,15 @@ namespace SilksongManager.Menu.Keybinds
         {
             var key = GetKeybind(action);
             return key != KeyCode.None && Input.GetKeyDown(key);
+        }
+
+        /// <summary>
+        /// Check if an action's key is currently held down.
+        /// </summary>
+        public static bool IsKeyHeld(ModAction action)
+        {
+            var key = GetKeybind(action);
+            return key != KeyCode.None && Input.GetKey(key);
         }
 
         /// <summary>
