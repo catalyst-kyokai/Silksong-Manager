@@ -7,7 +7,10 @@ namespace SilksongManager.SpeedControl
 {
     /// <summary>
     /// Harmony patches for speed control.
-    /// Enemy speed works like Time.timeScale: scales both velocity and animations.
+    /// 
+    /// Enemy Movement Speed = Animation speed only (no velocity changes to avoid physics issues)
+    /// Enemy Attack Speed = Attack animation speed + projectile velocity
+    /// 
     /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class SpeedControlPatches
@@ -18,11 +21,21 @@ namespace SilksongManager.SpeedControl
 
         // Reflection for tk2d
         private static System.Type _tk2dAnimatorType;
+        private static System.Type _tk2dClipType;
         private static PropertyInfo _clipFpsProperty;
+        private static PropertyInfo _currentClipProperty;
+        private static FieldInfo _clipNameField;
         private static bool _reflectionInitialized = false;
 
-        // Track which enemies have the scaler component
-        private static HashSet<int> _enemiesWithScaler = new();
+        // Movement animation names (to distinguish from attack anims)
+        private static readonly HashSet<string> _movementAnimNames = new()
+        {
+            "Walk", "Run", "Fly", "Idle", "Turn", "Move",
+            "walk", "run", "fly", "idle", "turn", "move",
+            "Walking", "Running", "Flying", "Turning", "Moving",
+            "walking", "running", "flying", "turning", "moving",
+            "Crawl", "crawl", "Crawling", "crawling"
+        };
 
         #endregion
 
@@ -49,10 +62,7 @@ namespace SilksongManager.SpeedControl
                 TryPatch(typeof(NailSlash), "PlaySlash", nameof(NailSlash_PlaySlash_Postfix), ref patchCount);
                 TryPatch(typeof(Downspike), "StartSlash", nameof(Downspike_StartSlash_Postfix), ref patchCount);
 
-                // Enemy initialization - add speed scaler component
-                TryPatch(typeof(HealthManager), "OnEnable", nameof(HealthManager_OnEnable_Postfix), ref patchCount);
-
-                // Enemy projectile velocity
+                // Enemy projectile velocity (Attack Speed)
                 TryPatch(typeof(EnemyBullet), "OnEnable", nameof(EnemyBullet_OnEnable_Postfix), ref patchCount);
 
                 // Patch tk2d for animation speed
@@ -86,7 +96,7 @@ namespace SilksongManager.SpeedControl
                 var playFromFrame = AccessTools.Method(_tk2dAnimatorType, "PlayFromFrame", new[] { typeof(string), typeof(int) });
                 if (playFromFrame != null)
                 {
-                    var postfix = typeof(SpeedControlPatches).GetMethod(nameof(Tk2d_Play_Postfix), BindingFlags.Public | BindingFlags.Static);
+                    var postfix = typeof(SpeedControlPatches).GetMethod(nameof(Tk2d_PlayFromFrame_Postfix), BindingFlags.Public | BindingFlags.Static);
                     _harmony.Patch(playFromFrame, postfix: new HarmonyMethod(postfix));
                     count++;
                     Plugin.Log.LogInfo("SpeedControl: Patched tk2d.PlayFromFrame");
@@ -103,18 +113,13 @@ namespace SilksongManager.SpeedControl
             try
             {
                 var original = AccessTools.Method(targetType, methodName);
-                if (original == null)
-                {
-                    Plugin.Log.LogWarning($"SpeedControl: {targetType.Name}.{methodName} not found");
-                    return;
-                }
+                if (original == null) return;
 
                 var patch = typeof(SpeedControlPatches).GetMethod(patchName, BindingFlags.Public | BindingFlags.Static);
                 if (patch == null) return;
 
                 _harmony.Patch(original, postfix: new HarmonyMethod(patch));
                 count++;
-                Plugin.Log.LogInfo($"SpeedControl: Patched {targetType.Name}.{methodName}");
             }
             catch (System.Exception e)
             {
@@ -131,12 +136,22 @@ namespace SilksongManager.SpeedControl
                 foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
                 {
                     _tk2dAnimatorType = asm.GetType("tk2dSpriteAnimator");
-                    if (_tk2dAnimatorType != null) break;
+                    if (_tk2dAnimatorType != null)
+                    {
+                        _tk2dClipType = asm.GetType("tk2dSpriteAnimationClip");
+                        break;
+                    }
                 }
 
                 if (_tk2dAnimatorType != null)
                 {
                     _clipFpsProperty = _tk2dAnimatorType.GetProperty("ClipFps");
+                    _currentClipProperty = _tk2dAnimatorType.GetProperty("CurrentClip");
+                }
+
+                if (_tk2dClipType != null)
+                {
+                    _clipNameField = _tk2dClipType.GetField("name");
                 }
             }
             catch { }
@@ -147,64 +162,102 @@ namespace SilksongManager.SpeedControl
         public static void Remove()
         {
             _harmony?.UnpatchSelf();
-            _enemiesWithScaler.Clear();
         }
 
         #endregion
 
-        #region tk2d Animation Patch
+        #region tk2d Animation Patches
 
         /// <summary>
-        /// Apply animation speed on every Play call.
+        /// Apply animation speed on Play(string) calls.
+        /// Distinguishes between movement and attack animations.
         /// </summary>
-        public static void Tk2d_Play_Postfix(object __instance)
+        public static void Tk2d_Play_Postfix(object __instance, string name)
+        {
+            ApplyAnimationSpeed(__instance, name);
+        }
+
+        public static void Tk2d_PlayFromFrame_Postfix(object __instance, string name)
+        {
+            ApplyAnimationSpeed(__instance, name);
+        }
+
+        private static void ApplyAnimationSpeed(object animator, string animName)
         {
             if (!SpeedControlConfig.IsEnabled) return;
             if (_clipFpsProperty == null) return;
 
             try
             {
-                var component = __instance as Component;
+                var component = animator as Component;
                 if (component == null) return;
 
                 var go = component.gameObject;
-                float mult = GetSpeedMultiplierForObject(go);
 
-                if (Mathf.Approximately(mult, 1f)) return;
+                // Skip hero (handled separately)
+                if (IsHeroObject(go)) return;
 
-                float currentFps = (float)_clipFpsProperty.GetValue(__instance);
-                if (currentFps > 0)
+                // Check if this is an enemy
+                bool isEnemy = IsEnemyObject(go);
+                if (!isEnemy)
                 {
-                    _clipFpsProperty.SetValue(__instance, currentFps * mult);
+                    // Environment animation
+                    float envMult = SpeedControlConfig.EnvironmentSpeed;
+                    if (!Mathf.Approximately(envMult, 1f))
+                    {
+                        ApplyFpsMult(animator, envMult);
+                    }
+                    return;
+                }
+
+                // For enemies, determine if this is a movement or attack animation
+                bool isMovementAnim = IsMovementAnimation(animName);
+
+                float mult = 1f;
+                if (isMovementAnim)
+                {
+                    // Movement animation - use movement speed
+                    mult = SpeedControlConfig.EffectiveEnemyMovement;
+                }
+                else
+                {
+                    // Attack/other animation - use attack speed
+                    mult = SpeedControlConfig.EffectiveEnemyAttack;
+                }
+
+                if (!Mathf.Approximately(mult, 1f))
+                {
+                    ApplyFpsMult(animator, mult);
                 }
             }
             catch { }
         }
 
-        #endregion
-
-        #region Enemy Patches
-
-        /// <summary>
-        /// Add EnemySpeedScaler component to enemies for velocity scaling.
-        /// </summary>
-        public static void HealthManager_OnEnable_Postfix(HealthManager __instance)
+        private static void ApplyFpsMult(object animator, float mult)
         {
-            if (__instance == null) return;
-
-            int id = __instance.gameObject.GetInstanceID();
-
-            // Add EnemySpeedScaler component if not already present
-            if (!_enemiesWithScaler.Contains(id))
+            try
             {
-                var existing = __instance.GetComponent<EnemySpeedScaler>();
-                if (existing == null)
+                float currentFps = (float)_clipFpsProperty.GetValue(animator);
+                if (currentFps > 0)
                 {
-                    __instance.gameObject.AddComponent<EnemySpeedScaler>();
-                    Plugin.Log.LogInfo($"SpeedControl: Added scaler to {__instance.gameObject.name}");
+                    _clipFpsProperty.SetValue(animator, currentFps * mult);
                 }
-                _enemiesWithScaler.Add(id);
             }
+            catch { }
+        }
+
+        private static bool IsMovementAnimation(string animName)
+        {
+            if (string.IsNullOrEmpty(animName)) return false;
+
+            // Check if animation name contains any movement keywords
+            foreach (var moveName in _movementAnimNames)
+            {
+                if (animName.Contains(moveName))
+                    return true;
+            }
+
+            return false;
         }
 
         #endregion
@@ -279,6 +332,9 @@ namespace SilksongManager.SpeedControl
 
         #region Enemy Projectile Patches
 
+        /// <summary>
+        /// Scale enemy bullet velocity for attack speed.
+        /// </summary>
         public static void EnemyBullet_OnEnable_Postfix(EnemyBullet __instance)
         {
             if (!SpeedControlConfig.IsEnabled) return;
@@ -302,32 +358,12 @@ namespace SilksongManager.SpeedControl
             if (rb != null && rb.linearVelocity.sqrMagnitude > 0.01f)
             {
                 rb.linearVelocity *= mult;
-                Plugin.Log.LogInfo($"SpeedControl: Scaled bullet velocity by {mult}");
             }
         }
 
         #endregion
 
         #region Helper Methods
-
-        private static float GetSpeedMultiplierForObject(GameObject go)
-        {
-            if (IsHeroObject(go))
-            {
-                return 1f; // Hero handled separately
-            }
-            else if (IsEnemyObject(go))
-            {
-                // For enemies, use the combined effective speed
-                float move = SpeedControlConfig.EffectiveEnemyMovement;
-                float attack = SpeedControlConfig.EffectiveEnemyAttack;
-                return Mathf.Max(move, attack);
-            }
-            else
-            {
-                return SpeedControlConfig.EnvironmentSpeed;
-            }
-        }
 
         private static bool IsHeroObject(GameObject go)
         {
@@ -365,10 +401,7 @@ namespace SilksongManager.SpeedControl
             SpeedControlManager.ApplyAllSpeeds();
         }
 
-        public static void ResetWalkerSpeeds()
-        {
-            _enemiesWithScaler.Clear();
-        }
+        public static void ResetWalkerSpeeds() { }
 
         #endregion
     }
