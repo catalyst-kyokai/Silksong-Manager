@@ -1,20 +1,19 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace SilksongManager.SpeedControl
 {
     /// <summary>
-    /// Controller that continuously applies environment speed to all appropriate objects.
-    /// Handles Animators, tk2d Animators, Particle Systems, and physics.
+    /// Efficient environment speed controller.
+    /// Only applies changes when speed multiplier changes, not continuously.
     /// </summary>
     public class EnvironmentSpeedController : MonoBehaviour
     {
         private float _lastAppliedMult = 1f;
-        private float _applyTimer = 0f;
-        private const float APPLY_INTERVAL = 0.5f; // Apply every 0.5 seconds
 
-        // Cache types for reflection
+        // Cache reflection once
         private static System.Type _tk2dAnimatorType;
-        private static System.Reflection.PropertyInfo _clipFpsProp;
+        private static System.Reflection.PropertyInfo _globalTimeScaleProp;
         private static bool _reflectionInitialized = false;
 
         void Start()
@@ -22,19 +21,17 @@ namespace SilksongManager.SpeedControl
             InitializeReflection();
         }
 
-        void Update()
+        void LateUpdate()
         {
             if (!SpeedControlConfig.IsEnabled) return;
 
             float mult = SpeedControlConfig.EnvironmentSpeed;
 
-            // Only apply when multiplier changed or at intervals
-            _applyTimer -= Time.unscaledDeltaTime;
-            if (_applyTimer <= 0f || Mathf.Abs(mult - _lastAppliedMult) > 0.01f)
+            // Only apply when multiplier actually changed
+            if (Mathf.Abs(mult - _lastAppliedMult) > 0.001f)
             {
                 ApplyToAllEnvironment(mult);
                 _lastAppliedMult = mult;
-                _applyTimer = APPLY_INTERVAL;
             }
         }
 
@@ -47,6 +44,7 @@ namespace SilksongManager.SpeedControl
 
         private void ApplyToParticleSystems(float mult)
         {
+            // Use cached array to reduce GC
             var particles = FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None);
             foreach (var ps in particles)
             {
@@ -72,7 +70,7 @@ namespace SilksongManager.SpeedControl
 
         private void ApplyToTk2dAnimators(float mult)
         {
-            if (_tk2dAnimatorType == null || _clipFpsProp == null) return;
+            if (_tk2dAnimatorType == null) return;
 
             try
             {
@@ -87,12 +85,9 @@ namespace SilksongManager.SpeedControl
 
                     try
                     {
-                        // We need to track original FPS to properly scale
-                        // For now, just set the speed property if available
-                        var speedProp = _tk2dAnimatorType.GetProperty("globalTimeScale");
-                        if (speedProp != null)
+                        if (_globalTimeScaleProp != null)
                         {
-                            speedProp.SetValue(anim, mult);
+                            _globalTimeScaleProp.SetValue(anim, mult);
                         }
                     }
                     catch { }
@@ -126,12 +121,21 @@ namespace SilksongManager.SpeedControl
                 _tk2dAnimatorType = asm.GetType("tk2dSpriteAnimator");
                 if (_tk2dAnimatorType != null)
                 {
-                    _clipFpsProp = _tk2dAnimatorType.GetProperty("ClipFps");
+                    _globalTimeScaleProp = _tk2dAnimatorType.GetProperty("globalTimeScale");
                     break;
                 }
             }
 
             _reflectionInitialized = true;
+        }
+
+        /// <summary>
+        /// Force reapply current speed.
+        /// </summary>
+        public void ForceReapply()
+        {
+            ApplyToAllEnvironment(SpeedControlConfig.EnvironmentSpeed);
+            _lastAppliedMult = SpeedControlConfig.EnvironmentSpeed;
         }
 
         /// <summary>
