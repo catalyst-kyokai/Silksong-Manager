@@ -65,10 +65,8 @@ namespace SilksongManager.SpeedControl
                 TryPatch(typeof(NailSlash), "PlaySlash", nameof(NailSlash_PlaySlash_Postfix), ref patchCount);
                 TryPatch(typeof(Downspike), "StartSlash", nameof(Downspike_StartSlash_Postfix), ref patchCount);
 
-                // Enemy projectile velocity (Attack Speed) - multiple projectile types
-                TryPatch(typeof(EnemyBullet), "OnEnable", nameof(Projectile_OnEnable_Postfix), ref patchCount);
-                TryPatch(typeof(SimpleProjectile), "OnEnable", nameof(Projectile_OnEnable_Postfix), ref patchCount);
-                TryPatch(typeof(ProjectileVelocityManager), "OnEnable", nameof(Projectile_OnEnable_Postfix), ref patchCount);
+                // Universal spawned object velocity scaling - patches ObjectPool.Spawn
+                PatchObjectPoolSpawn(ref patchCount);
 
                 // Enemy velocity scaling via EnemySpeedScaler component
                 TryPatch(typeof(HealthManager), "OnEnable", nameof(HealthManager_OnEnable_Postfix), ref patchCount);
@@ -146,6 +144,35 @@ namespace SilksongManager.SpeedControl
             catch (System.Exception e)
             {
                 Plugin.Log.LogError($"SpeedControl: tk2d patch failed: {e.Message}");
+            }
+        }
+
+        private static void PatchObjectPoolSpawn(ref int count)
+        {
+            try
+            {
+                // Patch ObjectPool.Spawn - the main method all spawned objects go through
+                var spawnMethod = AccessTools.Method(
+                    typeof(ObjectPool),
+                    "Spawn",
+                    new[] { typeof(GameObject), typeof(Transform), typeof(Vector3), typeof(Quaternion), typeof(bool) }
+                );
+
+                if (spawnMethod != null)
+                {
+                    var postfix = typeof(SpeedControlPatches).GetMethod(nameof(ObjectPool_Spawn_Postfix), BindingFlags.Public | BindingFlags.Static);
+                    _harmony.Patch(spawnMethod, postfix: new HarmonyMethod(postfix));
+                    count++;
+                    Plugin.Log.LogInfo("SpeedControl: Patched ObjectPool.Spawn");
+                }
+                else
+                {
+                    Plugin.Log.LogWarning("SpeedControl: ObjectPool.Spawn method not found");
+                }
+            }
+            catch (System.Exception e)
+            {
+                Plugin.Log.LogError($"SpeedControl: ObjectPool.Spawn patch failed: {e.Message}");
             }
         }
 
@@ -467,26 +494,29 @@ namespace SilksongManager.SpeedControl
 
         #region Enemy Projectile Patches
 
-        private static HashSet<int> _projectilesWithScaler = new();
+        private static HashSet<int> _spawnedWithScaler = new();
 
         /// <summary>
-        /// Attach ProjectileSpeedScaler to projectiles for velocity scaling.
-        /// Works with EnemyBullet, SimpleProjectile, ProjectileVelocityManager
+        /// Universal postfix for ObjectPool.Spawn - adds ProjectileSpeedScaler to all spawned objects with Rigidbody2D
         /// </summary>
-        public static void Projectile_OnEnable_Postfix(Component __instance)
+        public static void ObjectPool_Spawn_Postfix(GameObject __result)
         {
-            if (__instance == null) return;
+            if (__result == null) return;
+            if (!SpeedControlConfig.IsEnabled) return;
 
-            int id = __instance.gameObject.GetInstanceID();
+            int id = __result.GetInstanceID();
+            if (_spawnedWithScaler.Contains(id)) return;
+            _spawnedWithScaler.Add(id);
 
-            if (!_projectilesWithScaler.Contains(id))
+            // Add ProjectileSpeedScaler if object has Rigidbody2D and is NOT a player object
+            var rb = __result.GetComponent<Rigidbody2D>();
+            if (rb != null && !IsHeroObject(__result))
             {
-                var existing = __instance.GetComponent<ProjectileSpeedScaler>();
+                var existing = __result.GetComponent<ProjectileSpeedScaler>();
                 if (existing == null)
                 {
-                    __instance.gameObject.AddComponent<ProjectileSpeedScaler>();
+                    __result.AddComponent<ProjectileSpeedScaler>();
                 }
-                _projectilesWithScaler.Add(id);
             }
         }
 
