@@ -13,21 +13,7 @@ namespace SilksongManager.DebugMenu.Windows
 
         public override int WindowId => 10010;
         public override string Title => "Speed Control";
-        protected override Vector2 DefaultSize => new Vector2(320, 500);
-
-        #endregion
-
-        #region Private Fields
-
-        // Local copies for slider display
-        private float _globalSpeed = 1f;
-        private float _playerMovement = 1f;
-        private float _playerAttack = 1f;
-        private float _playerAll = 1f;
-        private float _enemyMovement = 1f;
-        private float _enemyAttack = 1f;
-        private float _enemyAll = 1f;
-        private float _environmentSpeed = 1f;
+        protected override Vector2 DefaultSize => new Vector2(320, 520);
 
         #endregion
 
@@ -35,39 +21,40 @@ namespace SilksongManager.DebugMenu.Windows
 
         protected override void DrawContent()
         {
-            // Sync local values from config
-            SyncFromConfig();
-
             // Global Speed Section
             DebugMenuStyles.DrawSectionHeader("GLOBAL SPEED");
-            DrawSpeedSlider("Time Scale", ref _globalSpeed, 0.1f, 5f);
-            DrawPresetButtons(ref _globalSpeed, new float[] { 0.25f, 0.5f, 1f, 2f, 5f });
-            if (GUILayout.Button("Apply Global", DebugMenuStyles.Button))
+            float globalSpeed = SpeedControl.SpeedControlConfig.GlobalSpeed;
+            float newGlobalSpeed = DrawSpeedSlider("Time Scale", globalSpeed, 0.1f, 5f);
+            if (newGlobalSpeed != globalSpeed)
             {
-                SpeedControl.SpeedControlManager.SetGlobalSpeed(_globalSpeed);
+                SpeedControl.SpeedControlManager.SetGlobalSpeed(newGlobalSpeed);
             }
+            DrawPresetButtonsGlobal();
 
             GUILayout.Space(10);
 
             // Player Speed Section
             DebugMenuStyles.DrawSectionHeader("PLAYER SPEED");
 
-            DrawSpeedSlider("Movement", ref _playerMovement, 0.1f, 5f);
-            if (GUILayout.Button("Apply Movement", DebugMenuStyles.ButtonSmall))
+            float playerMove = SpeedControl.SpeedControlConfig.PlayerMovementSpeed;
+            float newPlayerMove = DrawSpeedSlider("Movement", playerMove, 0.1f, 5f);
+            if (newPlayerMove != playerMove)
             {
-                SpeedControl.SpeedControlManager.SetPlayerMovementSpeed(_playerMovement);
+                SpeedControl.SpeedControlManager.SetPlayerMovementSpeed(newPlayerMove);
             }
 
-            DrawSpeedSlider("Attack", ref _playerAttack, 0.1f, 5f);
-            if (GUILayout.Button("Apply Attack", DebugMenuStyles.ButtonSmall))
+            float playerAtk = SpeedControl.SpeedControlConfig.PlayerAttackSpeed;
+            float newPlayerAtk = DrawSpeedSlider("Attack", playerAtk, 0.1f, 5f);
+            if (newPlayerAtk != playerAtk)
             {
-                SpeedControl.SpeedControlManager.SetPlayerAttackSpeed(_playerAttack);
+                SpeedControl.SpeedControlManager.SetPlayerAttackSpeed(newPlayerAtk);
             }
 
-            DrawSpeedSlider("All (Combined)", ref _playerAll, 0.1f, 5f);
-            if (GUILayout.Button("Apply All Player", DebugMenuStyles.ButtonSmall))
+            float playerAll = SpeedControl.SpeedControlConfig.PlayerAllSpeed;
+            float newPlayerAll = DrawSpeedSlider("All (Combined)", playerAll, 0.1f, 5f);
+            if (newPlayerAll != playerAll)
             {
-                SpeedControl.SpeedControlManager.SetPlayerAllSpeed(_playerAll);
+                SpeedControl.SpeedControlManager.SetPlayerAllSpeed(newPlayerAll);
             }
 
             GUILayout.Space(10);
@@ -75,32 +62,36 @@ namespace SilksongManager.DebugMenu.Windows
             // Enemy Speed Section
             DebugMenuStyles.DrawSectionHeader("ENEMY SPEED");
 
-            DrawSpeedSlider("Movement", ref _enemyMovement, 0.1f, 5f);
-            if (GUILayout.Button("Apply Movement", DebugMenuStyles.ButtonSmall))
+            float enemyMove = SpeedControl.SpeedControlConfig.EnemyMovementSpeed;
+            float newEnemyMove = DrawSpeedSlider("Movement", enemyMove, 0.1f, 5f);
+            if (newEnemyMove != enemyMove)
             {
-                SpeedControl.SpeedControlManager.SetEnemyMovementSpeed(_enemyMovement);
+                SpeedControl.SpeedControlManager.SetEnemyMovementSpeed(newEnemyMove);
             }
 
-            DrawSpeedSlider("Attack", ref _enemyAttack, 0.1f, 5f);
-            if (GUILayout.Button("Apply Attack", DebugMenuStyles.ButtonSmall))
+            float enemyAtk = SpeedControl.SpeedControlConfig.EnemyAttackSpeed;
+            float newEnemyAtk = DrawSpeedSlider("Attack", enemyAtk, 0.1f, 5f);
+            if (newEnemyAtk != enemyAtk)
             {
-                SpeedControl.SpeedControlManager.SetEnemyAttackSpeed(_enemyAttack);
+                SpeedControl.SpeedControlManager.SetEnemyAttackSpeed(newEnemyAtk);
             }
 
-            DrawSpeedSlider("All (Combined)", ref _enemyAll, 0.1f, 5f);
-            if (GUILayout.Button("Apply All Enemy", DebugMenuStyles.ButtonSmall))
+            float enemyAll = SpeedControl.SpeedControlConfig.EnemyAllSpeed;
+            float newEnemyAll = DrawSpeedSlider("All (Combined)", enemyAll, 0.1f, 5f);
+            if (newEnemyAll != enemyAll)
             {
-                SpeedControl.SpeedControlManager.SetEnemyAllSpeed(_enemyAll);
+                SpeedControl.SpeedControlManager.SetEnemyAllSpeed(newEnemyAll);
             }
 
             GUILayout.Space(10);
 
             // Environment Speed Section
             DebugMenuStyles.DrawSectionHeader("ENVIRONMENT SPEED");
-            DrawSpeedSlider("Environment", ref _environmentSpeed, 0.1f, 5f);
-            if (GUILayout.Button("Apply Environment", DebugMenuStyles.Button))
+            float envSpeed = SpeedControl.SpeedControlConfig.EnvironmentSpeed;
+            float newEnvSpeed = DrawSpeedSlider("Environment", envSpeed, 0.1f, 5f);
+            if (newEnvSpeed != envSpeed)
             {
-                SpeedControl.SpeedControlManager.SetEnvironmentSpeed(_environmentSpeed);
+                SpeedControl.SpeedControlManager.SetEnvironmentSpeed(newEnvSpeed);
             }
 
             GUILayout.Space(15);
@@ -110,7 +101,6 @@ namespace SilksongManager.DebugMenu.Windows
             if (GUILayout.Button("RESET ALL TO 1.0x", DebugMenuStyles.Button))
             {
                 SpeedControl.SpeedControlManager.ResetAll();
-                ResetLocalValues();
                 UI.NotificationManager.Show("Speed Reset", "All speeds set to 1.0x");
             }
 
@@ -123,69 +113,47 @@ namespace SilksongManager.DebugMenu.Windows
 
         #region Helper Methods
 
-        private void SyncFromConfig()
-        {
-            _globalSpeed = SpeedControl.SpeedControlConfig.GlobalSpeed;
-            _playerMovement = SpeedControl.SpeedControlConfig.PlayerMovementSpeed;
-            _playerAttack = SpeedControl.SpeedControlConfig.PlayerAttackSpeed;
-            _playerAll = SpeedControl.SpeedControlConfig.PlayerAllSpeed;
-            _enemyMovement = SpeedControl.SpeedControlConfig.EnemyMovementSpeed;
-            _enemyAttack = SpeedControl.SpeedControlConfig.EnemyAttackSpeed;
-            _enemyAll = SpeedControl.SpeedControlConfig.EnemyAllSpeed;
-            _environmentSpeed = SpeedControl.SpeedControlConfig.EnvironmentSpeed;
-        }
-
-        private void ResetLocalValues()
-        {
-            _globalSpeed = 1f;
-            _playerMovement = 1f;
-            _playerAttack = 1f;
-            _playerAll = 1f;
-            _enemyMovement = 1f;
-            _enemyAttack = 1f;
-            _enemyAll = 1f;
-            _environmentSpeed = 1f;
-        }
-
-        private void DrawSpeedSlider(string label, ref float value, float min, float max)
+        private float DrawSpeedSlider(string label, float value, float min, float max)
         {
             GUILayout.BeginHorizontal();
             GUILayout.Label($"{label}: {value:F2}x", DebugMenuStyles.Label, GUILayout.Width(140));
-            value = GUILayout.HorizontalSlider(value, min, max, GUILayout.ExpandWidth(true));
+            float newValue = GUILayout.HorizontalSlider(value, min, max, GUILayout.ExpandWidth(true));
             GUILayout.EndHorizontal();
+            return newValue;
         }
 
-        private void DrawPresetButtons(ref float value, float[] presets)
+        private void DrawPresetButtonsGlobal()
         {
             GUILayout.BeginHorizontal();
-            foreach (var preset in presets)
+            if (GUILayout.Button("0.25x", DebugMenuStyles.ButtonSmall))
             {
-                if (GUILayout.Button($"{preset}x", DebugMenuStyles.ButtonSmall))
-                {
-                    value = preset;
-                }
+                SpeedControl.SpeedControlManager.SetGlobalSpeed(0.25f);
+            }
+            if (GUILayout.Button("0.5x", DebugMenuStyles.ButtonSmall))
+            {
+                SpeedControl.SpeedControlManager.SetGlobalSpeed(0.5f);
+            }
+            if (GUILayout.Button("1x", DebugMenuStyles.ButtonSmall))
+            {
+                SpeedControl.SpeedControlManager.SetGlobalSpeed(1f);
+            }
+            if (GUILayout.Button("2x", DebugMenuStyles.ButtonSmall))
+            {
+                SpeedControl.SpeedControlManager.SetGlobalSpeed(2f);
+            }
+            if (GUILayout.Button("5x", DebugMenuStyles.ButtonSmall))
+            {
+                SpeedControl.SpeedControlManager.SetGlobalSpeed(5f);
             }
             GUILayout.EndHorizontal();
         }
 
         private void DrawStatusDisplay()
         {
-            GUILayout.Label("Current Status:", DebugMenuStyles.Label);
+            GUILayout.Label("Current Status:", DebugMenuStyles.LabelBold);
 
             // Show effective values
-            string status = $"Global: {SpeedControl.SpeedControlConfig.GlobalSpeed:F2}x";
-            if (SpeedControl.SpeedControlConfig.EffectivePlayerMovement != 1f || SpeedControl.SpeedControlConfig.EffectivePlayerAttack != 1f)
-            {
-                status += $"\nPlayer Move: {SpeedControl.SpeedControlConfig.EffectivePlayerMovement:F2}x, Atk: {SpeedControl.SpeedControlConfig.EffectivePlayerAttack:F2}x";
-            }
-            if (SpeedControl.SpeedControlConfig.EffectiveEnemyMovement != 1f || SpeedControl.SpeedControlConfig.EffectiveEnemyAttack != 1f)
-            {
-                status += $"\nEnemy Move: {SpeedControl.SpeedControlConfig.EffectiveEnemyMovement:F2}x, Atk: {SpeedControl.SpeedControlConfig.EffectiveEnemyAttack:F2}x";
-            }
-            if (SpeedControl.SpeedControlConfig.EnvironmentSpeed != 1f)
-            {
-                status += $"\nEnvironment: {SpeedControl.SpeedControlConfig.EnvironmentSpeed:F2}x";
-            }
+            string status = $"Time Scale: {Time.timeScale:F2}x";
 
             GUILayout.Label(status, DebugMenuStyles.Label);
         }
