@@ -7,35 +7,28 @@ namespace SilksongManager.SpeedControl
 {
     /// <summary>
     /// Harmony patches for speed control.
-    /// Handles player attacks via NailSlash and enemy movement via Walker.
+    /// Uses universal approach: patch physics and animations for all game objects.
     /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class SpeedControlPatches
     {
         #region Fields
 
-        /// <summary>Harmony instance for patching.</summary>
         private static Harmony _harmony;
+        private static Dictionary<int, float> _originalEnemySpeeds = new();
 
-        /// <summary>Tracks original Walker speeds for restoration.</summary>
-        private static Dictionary<Walker, (float left, float right)> _originalWalkerSpeeds = new();
-
-        /// <summary>Cached reflection for tk2dSpriteAnimator.</summary>
+        // Reflection for tk2d
         private static System.Type _tk2dAnimatorType;
         private static PropertyInfo _clipFpsProperty;
         private static PropertyInfo _currentClipProperty;
         private static bool _reflectionInitialized = false;
 
-        /// <summary>Debug logging enabled.</summary>
-        private static bool _debugLogging = true;
+        private static bool _debugLogging = false;
 
         #endregion
 
         #region Public Methods
 
-        /// <summary>
-        /// Apply all speed control patches.
-        /// </summary>
         public static void Apply()
         {
             try
@@ -43,90 +36,58 @@ namespace SilksongManager.SpeedControl
                 InitializeReflection();
                 _harmony = new Harmony("com.catalyst.silksongmanager.speedcontrol");
 
-                // Manually patch each method to provide better error diagnostics
-                var patchCount = 0;
+                int patchCount = 0;
 
                 // GameManager patches
                 TryPatch(typeof(GameManager), "UnpauseGame", nameof(GameManager_UnpauseGame_Postfix), ref patchCount);
-                TryPatch(typeof(GameManager), "SetTimeScale", nameof(GameManager_SetTimeScale_Postfix), ref patchCount);
 
                 // HeroController patches
                 TryPatch(typeof(HeroController), "Start", nameof(HeroController_Start_Postfix), ref patchCount);
                 TryPatch(typeof(HeroController), "TakeDamage", nameof(HeroController_TakeDamage_Postfix), ref patchCount);
                 TryPatch(typeof(HeroController), "Respawn", nameof(HeroController_Respawn_Postfix), ref patchCount);
 
-                // NailSlash patches
+                // Player attack patches
                 TryPatch(typeof(NailSlash), "PlaySlash", nameof(NailSlash_PlaySlash_Postfix), ref patchCount);
+                TryPatch(typeof(Downspike), "StartSlash", nameof(Downspike_StartSlash_Postfix), ref patchCount);
 
-                // Walker patches
-                TryPatch(typeof(Walker), "Start", nameof(Walker_Start_Postfix), ref patchCount);
-                TryPatch(typeof(Walker), "UpdateWalking", nameof(Walker_UpdateWalking_Postfix), ref patchCount);
-                TryPatch(typeof(Walker), "BeginWalking", nameof(Walker_BeginWalking_Postfix), ref patchCount);
-
-                // Crawler patches
-                TryPatchOverload(typeof(Crawler), "StartCrawling", new[] { typeof(bool) }, nameof(Crawler_StartCrawling_Postfix), ref patchCount);
-
-                // HealthManager patches
+                // Universal enemy speed via HealthManager
                 TryPatch(typeof(HealthManager), "OnEnable", nameof(HealthManager_OnEnable_Postfix), ref patchCount);
 
-                Plugin.Log.LogInfo($"SpeedControlPatches: {patchCount} patches applied successfully");
+                // Rigidbody2D velocity scaling
+                TryPatch(typeof(Rigidbody2D), "set_linearVelocity", nameof(Rigidbody2D_SetVelocity_Prefix), ref patchCount, isPrefix: true);
+
+                Plugin.Log.LogInfo($"SpeedControlPatches: {patchCount} patches applied");
             }
             catch (System.Exception e)
             {
-                Plugin.Log.LogError($"Failed to apply SpeedControlPatches: {e.Message}\n{e.StackTrace}");
+                Plugin.Log.LogError($"SpeedControlPatches failed: {e.Message}\n{e.StackTrace}");
             }
         }
 
-        private static void TryPatch(System.Type targetType, string methodName, string postfixName, ref int count)
+        private static void TryPatch(System.Type targetType, string methodName, string patchName, ref int count, bool isPrefix = false)
         {
             try
             {
                 var original = AccessTools.Method(targetType, methodName);
                 if (original == null)
                 {
-                    Plugin.Log.LogWarning($"SpeedControl: Method {targetType.Name}.{methodName} not found");
+                    if (_debugLogging) Plugin.Log.LogWarning($"SpeedControl: {targetType.Name}.{methodName} not found");
                     return;
                 }
 
-                var postfix = typeof(SpeedControlPatches).GetMethod(postfixName, BindingFlags.Public | BindingFlags.Static);
-                if (postfix == null)
+                var patch = typeof(SpeedControlPatches).GetMethod(patchName, BindingFlags.Public | BindingFlags.Static);
+                if (patch == null)
                 {
-                    Plugin.Log.LogWarning($"SpeedControl: Postfix {postfixName} not found");
+                    if (_debugLogging) Plugin.Log.LogWarning($"SpeedControl: Patch {patchName} not found");
                     return;
                 }
 
-                _harmony.Patch(original, postfix: new HarmonyMethod(postfix));
+                if (isPrefix)
+                    _harmony.Patch(original, prefix: new HarmonyMethod(patch));
+                else
+                    _harmony.Patch(original, postfix: new HarmonyMethod(patch));
+
                 count++;
-                if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Patched {targetType.Name}.{methodName}");
-            }
-            catch (System.Exception e)
-            {
-                Plugin.Log.LogError($"SpeedControl: Failed to patch {targetType.Name}.{methodName}: {e.Message}");
-            }
-        }
-
-        private static void TryPatchOverload(System.Type targetType, string methodName, System.Type[] argTypes, string postfixName, ref int count)
-        {
-            try
-            {
-                var original = AccessTools.Method(targetType, methodName, argTypes);
-                if (original == null)
-                {
-                    string argStr = argTypes != null ? string.Join(", ", System.Array.ConvertAll(argTypes, t => t.Name)) : "";
-                    Plugin.Log.LogWarning($"SpeedControl: Method {targetType.Name}.{methodName}({argStr}) not found");
-                    return;
-                }
-
-                var postfix = typeof(SpeedControlPatches).GetMethod(postfixName, BindingFlags.Public | BindingFlags.Static);
-                if (postfix == null)
-                {
-                    Plugin.Log.LogWarning($"SpeedControl: Postfix {postfixName} not found");
-                    return;
-                }
-
-                _harmony.Patch(original, postfix: new HarmonyMethod(postfix));
-                count++;
-                if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Patched {targetType.Name}.{methodName}");
             }
             catch (System.Exception e)
             {
@@ -140,57 +101,30 @@ namespace SilksongManager.SpeedControl
 
             try
             {
-                Plugin.Log.LogInfo("SpeedControl: Initializing tk2d reflection...");
-
-                // Find tk2dSpriteAnimator type
                 foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
                 {
                     _tk2dAnimatorType = asm.GetType("tk2dSpriteAnimator");
-                    if (_tk2dAnimatorType != null)
-                    {
-                        Plugin.Log.LogInfo($"SpeedControl: Found tk2dSpriteAnimator in assembly {asm.GetName().Name}");
-                        break;
-                    }
+                    if (_tk2dAnimatorType != null) break;
                 }
 
                 if (_tk2dAnimatorType != null)
                 {
                     _clipFpsProperty = _tk2dAnimatorType.GetProperty("ClipFps");
                     _currentClipProperty = _tk2dAnimatorType.GetProperty("CurrentClip");
-
-                    Plugin.Log.LogInfo($"SpeedControl: tk2d reflection - ClipFps: {_clipFpsProperty != null}, CurrentClip: {_currentClipProperty != null}");
-
-                    // Log all properties for debugging
-                    if (_debugLogging)
-                    {
-                        var props = _tk2dAnimatorType.GetProperties();
-                        Plugin.Log.LogInfo($"SpeedControl: tk2dSpriteAnimator has {props.Length} properties:");
-                        foreach (var prop in props)
-                        {
-                            Plugin.Log.LogInfo($"  - {prop.Name} ({prop.PropertyType.Name})");
-                        }
-                    }
-                }
-                else
-                {
-                    Plugin.Log.LogWarning("SpeedControl: tk2dSpriteAnimator type not found in any assembly");
                 }
             }
             catch (System.Exception e)
             {
-                Plugin.Log.LogError($"SpeedControl: Reflection init failed: {e.Message}");
+                Plugin.Log.LogError($"SpeedControl reflection failed: {e.Message}");
             }
 
             _reflectionInitialized = true;
         }
 
-        /// <summary>
-        /// Remove all patches.
-        /// </summary>
         public static void Remove()
         {
             _harmony?.UnpatchSelf();
-            _originalWalkerSpeeds.Clear();
+            _originalEnemySpeeds.Clear();
         }
 
         #endregion
@@ -204,17 +138,6 @@ namespace SilksongManager.SpeedControl
             if (SpeedControlConfig.GlobalSpeed != 1f)
             {
                 Time.timeScale = SpeedControlConfig.GlobalSpeed;
-                if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Restored timeScale to {SpeedControlConfig.GlobalSpeed}");
-            }
-        }
-
-        public static void GameManager_SetTimeScale_Postfix(float newTimeScale)
-        {
-            if (!SpeedControlConfig.IsEnabled) return;
-
-            if (Mathf.Approximately(newTimeScale, 1f) && SpeedControlConfig.GlobalSpeed != 1f)
-            {
-                Time.timeScale = SpeedControlConfig.GlobalSpeed;
             }
         }
 
@@ -224,16 +147,12 @@ namespace SilksongManager.SpeedControl
 
         public static void HeroController_Start_Postfix(HeroController __instance)
         {
-            if (_debugLogging) Plugin.Log.LogInfo("SpeedControl: HeroController.Start called");
-
             if (!SpeedControlConfig.OriginalsCaptured)
             {
                 SpeedControlConfig.OriginalRunSpeed = __instance.RUN_SPEED;
                 SpeedControlConfig.OriginalWalkSpeed = __instance.WALK_SPEED;
                 SpeedControlConfig.OriginalsCaptured = true;
-                Plugin.Log.LogInfo($"SpeedControl: Captured original speeds - Run: {SpeedControlConfig.OriginalRunSpeed}, Walk: {SpeedControlConfig.OriginalWalkSpeed}");
             }
-
             SpeedControlManager.ApplyPlayerSpeed();
         }
 
@@ -246,7 +165,6 @@ namespace SilksongManager.SpeedControl
         public static void HeroController_Respawn_Postfix()
         {
             if (!SpeedControlConfig.IsEnabled) return;
-
             if (Plugin.Instance != null)
             {
                 Plugin.Instance.StartCoroutine(ApplySpeedsNextFrame());
@@ -255,181 +173,112 @@ namespace SilksongManager.SpeedControl
 
         #endregion
 
-        #region NailSlash Patches (Player Attack Speed)
+        #region Player Attack Patches
 
         public static void NailSlash_PlaySlash_Postfix(NailSlash __instance)
         {
-            if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: NailSlash.PlaySlash called on {__instance.gameObject.name}");
-
             if (!SpeedControlConfig.IsEnabled) return;
 
             float mult = SpeedControlConfig.EffectivePlayerAttack;
-            if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Player attack mult = {mult}");
-
             if (Mathf.Approximately(mult, 1f)) return;
 
-            // Try via reflection
-            bool applied = ApplyTk2dSpeedMultiplier(__instance.gameObject, mult);
-            if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: NailSlash tk2d speed applied: {applied}");
-        }
-
-        #endregion
-
-        #region Walker Patches (Enemy Movement Speed)
-
-        public static void Walker_Start_Postfix(Walker __instance)
-        {
-            if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Walker.Start called on {__instance.gameObject.name}");
-
-            if (!_originalWalkerSpeeds.ContainsKey(__instance))
-            {
-                _originalWalkerSpeeds[__instance] = (__instance.walkSpeedL, __instance.walkSpeedR);
-                if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Captured Walker speeds - L: {__instance.walkSpeedL}, R: {__instance.walkSpeedR}");
-            }
-
-            ApplyWalkerSpeed(__instance);
-        }
-
-        public static void Walker_UpdateWalking_Postfix(Walker __instance)
-        {
-            if (!SpeedControlConfig.IsEnabled) return;
-
-            float mult = SpeedControlConfig.EffectiveEnemyMovement;
-            if (Mathf.Approximately(mult, 1f)) return;
-
-            // Get rigidbody and scale horizontal velocity
-            var rb = __instance.GetComponent<Rigidbody2D>();
-            if (rb != null)
-            {
-                var vel = rb.linearVelocity;
-                if (!_originalWalkerSpeeds.TryGetValue(__instance, out var original))
-                {
-                    original = (__instance.walkSpeedL, __instance.walkSpeedR);
-                }
-
-                // Apply multiplier to horizontal velocity
-                if (vel.x > 0)
-                    rb.linearVelocity = new Vector2(original.right * mult, vel.y);
-                else if (vel.x < 0)
-                    rb.linearVelocity = new Vector2(original.left * mult, vel.y);
-            }
-
-            // Also apply to animator
             ApplyTk2dSpeedMultiplier(__instance.gameObject, mult);
         }
 
-        public static void Walker_BeginWalking_Postfix(Walker __instance)
+        public static void Downspike_StartSlash_Postfix(Downspike __instance)
         {
-            if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Walker.BeginWalking called on {__instance.gameObject.name}");
-
             if (!SpeedControlConfig.IsEnabled) return;
 
+            float mult = SpeedControlConfig.EffectivePlayerAttack;
+            if (Mathf.Approximately(mult, 1f)) return;
+
+            ApplyTk2dSpeedMultiplier(__instance.gameObject, mult);
+            if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Applied attack speed to Downspike");
+        }
+
+        #endregion
+
+        #region Enemy Patches
+
+        public static void HealthManager_OnEnable_Postfix(HealthManager __instance)
+        {
+            if (!SpeedControlConfig.IsEnabled) return;
+
+            // Store object ID for tracking
+            int id = __instance.gameObject.GetInstanceID();
+            if (!_originalEnemySpeeds.ContainsKey(id))
+            {
+                _originalEnemySpeeds[id] = 1f; // Mark as tracked
+            }
+
+            // Apply enemy animation speed
             float animMult = SpeedControlConfig.EffectiveEnemyAttack;
             if (!Mathf.Approximately(animMult, 1f))
             {
-                ApplyTk2dSpeedMultiplier(__instance.gameObject, animMult);
+                ApplyTk2dSpeedMultiplierToChildren(__instance.gameObject, animMult);
             }
         }
 
-        private static void ApplyWalkerSpeed(Walker walker)
+        /// <summary>
+        /// Intercept all Rigidbody2D velocity sets and scale for enemies.
+        /// </summary>
+        public static void Rigidbody2D_SetVelocity_Prefix(Rigidbody2D __instance, ref Vector2 value)
         {
             if (!SpeedControlConfig.IsEnabled) return;
 
             float mult = SpeedControlConfig.EffectiveEnemyMovement;
-            if (_originalWalkerSpeeds.TryGetValue(walker, out var original))
-            {
-                walker.walkSpeedL = original.left * mult;
-                walker.walkSpeedR = original.right * mult;
-                if (_debugLogging && !Mathf.Approximately(mult, 1f))
-                {
-                    Plugin.Log.LogInfo($"SpeedControl: Applied Walker speed mult {mult} - L: {walker.walkSpeedL}, R: {walker.walkSpeedR}");
-                }
-            }
-        }
+            if (Mathf.Approximately(mult, 1f)) return;
 
-        #endregion
+            // Check if this belongs to an enemy (has HealthManager)
+            var hm = __instance.GetComponentInParent<HealthManager>();
+            if (hm == null) return;
 
-        #region Crawler Patches (Enemy Movement Speed)
+            // Don't modify hero
+            var hero = HeroController.instance;
+            if (hero != null && __instance.gameObject == hero.gameObject) return;
 
-        public static void Crawler_StartCrawling_Postfix(Crawler __instance)
-        {
-            if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Crawler.StartCrawling called on {__instance.gameObject.name}");
-
-            if (!SpeedControlConfig.IsEnabled) return;
-
-            float animMult = SpeedControlConfig.EffectiveEnemyAttack;
-            if (!Mathf.Approximately(animMult, 1f))
-            {
-                ApplyTk2dSpeedMultiplier(__instance.gameObject, animMult);
-            }
-        }
-
-        #endregion
-
-        #region HealthManager Patches (Enemy Attack Speed)
-
-        public static void HealthManager_OnEnable_Postfix(HealthManager __instance)
-        {
-            if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: HealthManager.OnEnable called on {__instance.gameObject.name}");
-
-            if (!SpeedControlConfig.IsEnabled) return;
-
-            float animMult = SpeedControlConfig.EffectiveEnemyAttack;
-            if (!Mathf.Approximately(animMult, 1f))
-            {
-                ApplyTk2dSpeedMultiplier(__instance.gameObject, animMult);
-            }
+            // Scale velocity
+            value = new Vector2(value.x * mult, value.y * mult);
         }
 
         #endregion
 
         #region Helper Methods
 
-        /// <summary>
-        /// Apply speed multiplier to tk2dSpriteAnimator via reflection.
-        /// Returns true if successful.
-        /// </summary>
-        private static bool ApplyTk2dSpeedMultiplier(GameObject go, float mult)
+        private static void ApplyTk2dSpeedMultiplier(GameObject go, float mult)
         {
-            if (_tk2dAnimatorType == null)
-            {
-                if (_debugLogging) Plugin.Log.LogWarning("SpeedControl: tk2dAnimatorType is null");
-                return false;
-            }
+            if (_tk2dAnimatorType == null || _clipFpsProperty == null) return;
 
             try
             {
                 var animComponent = go.GetComponent(_tk2dAnimatorType);
-                if (animComponent == null)
-                {
-                    animComponent = go.GetComponentInChildren(_tk2dAnimatorType);
-                }
+                if (animComponent == null) return;
 
-                if (animComponent == null)
-                {
-                    if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: No tk2dSpriteAnimator found on {go.name}");
-                    return false;
-                }
-
-                if (_clipFpsProperty == null)
-                {
-                    if (_debugLogging) Plugin.Log.LogWarning("SpeedControl: ClipFps property is null");
-                    return false;
-                }
-
-                // Check if we can get/set ClipFps
                 float currentFps = (float)_clipFpsProperty.GetValue(animComponent);
-                float newFps = currentFps * mult;
-                _clipFpsProperty.SetValue(animComponent, newFps);
+                _clipFpsProperty.SetValue(animComponent, currentFps * mult);
+            }
+            catch { }
+        }
 
-                if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Applied tk2d speed on {go.name}: {currentFps} -> {newFps}");
-                return true;
-            }
-            catch (System.Exception e)
+        private static void ApplyTk2dSpeedMultiplierToChildren(GameObject go, float mult)
+        {
+            if (_tk2dAnimatorType == null || _clipFpsProperty == null) return;
+
+            try
             {
-                Plugin.Log.LogError($"SpeedControl: ApplyTk2dSpeedMultiplier failed on {go.name}: {e.Message}");
-                return false;
+                var animators = go.GetComponentsInChildren(_tk2dAnimatorType, true);
+                foreach (var anim in animators)
+                {
+                    if (anim == null) continue;
+                    try
+                    {
+                        float currentFps = (float)_clipFpsProperty.GetValue(anim);
+                        _clipFpsProperty.SetValue(anim, currentFps * mult);
+                    }
+                    catch { }
+                }
             }
+            catch { }
         }
 
         private static System.Collections.IEnumerator ApplySpeedsNextFrame()
@@ -438,20 +287,9 @@ namespace SilksongManager.SpeedControl
             SpeedControlManager.ApplyAllSpeeds();
         }
 
-        /// <summary>
-        /// Reset all Walker speeds to original.
-        /// </summary>
         public static void ResetWalkerSpeeds()
         {
-            foreach (var kvp in _originalWalkerSpeeds)
-            {
-                if (kvp.Key != null)
-                {
-                    kvp.Key.walkSpeedL = kvp.Value.left;
-                    kvp.Key.walkSpeedR = kvp.Value.right;
-                }
-            }
-            Plugin.Log.LogInfo($"SpeedControl: Reset {_originalWalkerSpeeds.Count} Walker speeds");
+            _originalEnemySpeeds.Clear();
         }
 
         #endregion

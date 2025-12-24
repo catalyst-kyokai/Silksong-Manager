@@ -236,8 +236,9 @@ namespace SilksongManager.SpeedControl
             if (!SpeedControlConfig.IsEnabled) return;
 
             float mult = SpeedControlConfig.EnvironmentSpeed;
+            if (Mathf.Approximately(mult, 1f)) return;
 
-            // Apply to animators not on hero/enemies
+            // Apply to Unity Animators not on hero/enemies
             var animators = Object.FindObjectsByType<Animator>(FindObjectsSortMode.None);
             foreach (var anim in animators)
             {
@@ -245,6 +246,59 @@ namespace SilksongManager.SpeedControl
                 if (IsHeroOrEnemy(anim.gameObject)) continue;
 
                 anim.speed = mult;
+            }
+
+            // Apply to tk2dSpriteAnimators via reflection
+            ApplyTk2dEnvironmentSpeed(mult);
+        }
+
+        /// <summary>
+        /// Apply environment speed to all tk2d animators (except hero and enemies).
+        /// </summary>
+        private static void ApplyTk2dEnvironmentSpeed(float mult)
+        {
+            try
+            {
+                // Find tk2d type via reflection
+                System.Type tk2dType = null;
+                foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    tk2dType = asm.GetType("tk2dSpriteAnimator");
+                    if (tk2dType != null) break;
+                }
+
+                if (tk2dType == null) return;
+
+                var clipFpsProp = tk2dType.GetProperty("ClipFps");
+                if (clipFpsProp == null) return;
+
+                // Find all tk2d animators in scene
+                var allTk2d = Object.FindObjectsByType(tk2dType, FindObjectsSortMode.None);
+                foreach (var anim in allTk2d)
+                {
+                    if (anim == null) continue;
+
+                    var component = anim as Component;
+                    if (component == null) continue;
+
+                    // Skip hero and enemies
+                    if (IsHeroOrEnemy(component.gameObject)) continue;
+
+                    try
+                    {
+                        float currentFps = (float)clipFpsProp.GetValue(anim);
+                        // Only apply if non-zero and not already modified
+                        if (currentFps > 0)
+                        {
+                            clipFpsProp.SetValue(anim, currentFps * mult);
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Plugin.Log.LogError($"ApplyTk2dEnvironmentSpeed failed: {e.Message}");
             }
         }
 
