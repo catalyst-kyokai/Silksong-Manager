@@ -27,6 +27,9 @@ namespace SilksongManager.SpeedControl
         private static FieldInfo _clipNameField;
         private static bool _reflectionInitialized = false;
 
+        // Track which enemies have the scaler component
+        private static HashSet<int> _enemiesWithScaler = new();
+
         // Movement animation names (to distinguish from attack anims)
         private static readonly HashSet<string> _movementAnimNames = new()
         {
@@ -64,6 +67,9 @@ namespace SilksongManager.SpeedControl
 
                 // Enemy projectile velocity (Attack Speed)
                 TryPatch(typeof(EnemyBullet), "OnEnable", nameof(EnemyBullet_OnEnable_Postfix), ref patchCount);
+
+                // Enemy velocity scaling via EnemySpeedScaler component
+                TryPatch(typeof(HealthManager), "OnEnable", nameof(HealthManager_OnEnable_Postfix), ref patchCount);
 
                 // Patch tk2d for animation speed
                 PatchTk2dAnimator(ref patchCount);
@@ -301,6 +307,31 @@ namespace SilksongManager.SpeedControl
             if (Plugin.Instance != null)
             {
                 Plugin.Instance.StartCoroutine(ApplySpeedsNextFrame());
+            }
+        }
+
+        #endregion
+
+        #region Enemy Velocity Scaling
+
+        /// <summary>
+        /// Add EnemySpeedScaler component to enemies for velocity scaling.
+        /// </summary>
+        public static void HealthManager_OnEnable_Postfix(HealthManager __instance)
+        {
+            if (__instance == null) return;
+
+            int id = __instance.gameObject.GetInstanceID();
+
+            // Add EnemySpeedScaler component if not already present
+            if (!_enemiesWithScaler.Contains(id))
+            {
+                var existing = __instance.GetComponent<EnemySpeedScaler>();
+                if (existing == null)
+                {
+                    __instance.gameObject.AddComponent<EnemySpeedScaler>();
+                }
+                _enemiesWithScaler.Add(id);
             }
         }
 
