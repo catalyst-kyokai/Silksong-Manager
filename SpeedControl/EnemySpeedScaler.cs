@@ -4,7 +4,7 @@ namespace SilksongManager.SpeedControl
 {
     /// <summary>
     /// Scales enemy velocities to simulate time scale effect.
-    /// Tracks original velocity and scales relative to it.
+    /// Only affects Rigidbody2D based movement within walking speed range.
     /// </summary>
     public class EnemySpeedScaler : MonoBehaviour
     {
@@ -12,12 +12,11 @@ namespace SilksongManager.SpeedControl
         private HealthManager _hm;
 
         // Walking speed threshold - above this is likely a dash/attack
-        private const float WALK_SPEED_MAX = 15f;
+        // Increased to accommodate flying enemies which often move slower
+        private const float WALK_SPEED_MAX = 25f;
 
-        // Track the last velocity we set (to detect when game changes it)
-        private Vector2 _ourLastVelocity;
-        private Vector2 _originalVelocity;
-        private bool _hasOriginal;
+        // Minimum speed to consider for scaling
+        private const float MIN_SPEED = 0.5f;
 
         void Awake()
         {
@@ -34,50 +33,29 @@ namespace SilksongManager.SpeedControl
 
             float moveMult = SpeedControlConfig.EffectiveEnemyMovement;
 
+            // Skip if multiplier is 1
+            if (Mathf.Approximately(moveMult, 1f)) return;
+
             Vector2 currentVel = _rb.linearVelocity;
             float speed = currentVel.magnitude;
 
             // Ignore very small movements
-            if (speed < 0.1f)
-            {
-                _hasOriginal = false;
-                return;
-            }
+            if (speed < MIN_SPEED) return;
 
-            // Check if this is a new velocity (game set it) or our scaled velocity
-            bool velocityChangedByGame = !_hasOriginal ||
-                Vector2.Distance(currentVel, _ourLastVelocity) > 0.5f;
+            // Only scale walking-speed movements, not dashes/attacks
+            // Dashes typically have much higher velocities
+            if (speed > WALK_SPEED_MAX) return;
 
-            if (velocityChangedByGame)
-            {
-                // Game set a new velocity - this is the original
-                _originalVelocity = currentVel;
-                _hasOriginal = true;
-            }
+            // Scale velocity - since game continuously sets velocity each frame,
+            // we just need to multiply the current value
+            // The game will reset it next frame, and we'll scale again
+            Vector2 direction = currentVel.normalized;
+            float scaledSpeed = speed * moveMult;
 
-            float originalSpeed = _originalVelocity.magnitude;
+            // Clamp to prevent exceeding dash thresholds
+            scaledSpeed = Mathf.Min(scaledSpeed, WALK_SPEED_MAX);
 
-            // Only scale walking-speed movements, not dashes
-            if (originalSpeed > WALK_SPEED_MAX)
-            {
-                // This is a dash/attack - don't scale
-                _ourLastVelocity = currentVel;
-                return;
-            }
-
-            // Skip if multiplier is 1
-            if (Mathf.Approximately(moveMult, 1f))
-            {
-                _ourLastVelocity = currentVel;
-                return;
-            }
-
-            // Calculate scaled velocity based on ORIGINAL (unscaled) velocity
-            Vector2 scaledVel = _originalVelocity * moveMult;
-
-            // Apply scaled velocity
-            _rb.linearVelocity = scaledVel;
-            _ourLastVelocity = scaledVel;
+            _rb.linearVelocity = direction * scaledSpeed;
         }
     }
 }

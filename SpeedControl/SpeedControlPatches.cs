@@ -65,8 +65,10 @@ namespace SilksongManager.SpeedControl
                 TryPatch(typeof(NailSlash), "PlaySlash", nameof(NailSlash_PlaySlash_Postfix), ref patchCount);
                 TryPatch(typeof(Downspike), "StartSlash", nameof(Downspike_StartSlash_Postfix), ref patchCount);
 
-                // Enemy projectile velocity (Attack Speed)
-                TryPatch(typeof(EnemyBullet), "OnEnable", nameof(EnemyBullet_OnEnable_Postfix), ref patchCount);
+                // Enemy projectile velocity (Attack Speed) - multiple projectile types
+                TryPatch(typeof(EnemyBullet), "OnEnable", nameof(Projectile_OnEnable_Postfix), ref patchCount);
+                TryPatch(typeof(SimpleProjectile), "OnEnable", nameof(Projectile_OnEnable_Postfix), ref patchCount);
+                TryPatch(typeof(ProjectileVelocityManager), "OnEnable", nameof(Projectile_OnEnable_Postfix), ref patchCount);
 
                 // Enemy velocity scaling via EnemySpeedScaler component
                 TryPatch(typeof(HealthManager), "OnEnable", nameof(HealthManager_OnEnable_Postfix), ref patchCount);
@@ -465,32 +467,26 @@ namespace SilksongManager.SpeedControl
 
         #region Enemy Projectile Patches
 
+        private static HashSet<int> _projectilesWithScaler = new();
+
         /// <summary>
-        /// Scale enemy bullet velocity for attack speed.
+        /// Attach ProjectileSpeedScaler to projectiles for velocity scaling.
+        /// Works with EnemyBullet, SimpleProjectile, ProjectileVelocityManager
         /// </summary>
-        public static void EnemyBullet_OnEnable_Postfix(EnemyBullet __instance)
+        public static void Projectile_OnEnable_Postfix(Component __instance)
         {
-            if (!SpeedControlConfig.IsEnabled) return;
+            if (__instance == null) return;
 
-            float mult = SpeedControlConfig.EffectiveEnemyAttack;
-            if (Mathf.Approximately(mult, 1f)) return;
+            int id = __instance.gameObject.GetInstanceID();
 
-            if (Plugin.Instance != null)
+            if (!_projectilesWithScaler.Contains(id))
             {
-                Plugin.Instance.StartCoroutine(ScaleBulletVelocity(__instance, mult));
-            }
-        }
-
-        private static System.Collections.IEnumerator ScaleBulletVelocity(EnemyBullet bullet, float mult)
-        {
-            yield return null;
-
-            if (bullet == null) yield break;
-
-            var rb = bullet.GetComponent<Rigidbody2D>();
-            if (rb != null && rb.linearVelocity.sqrMagnitude > 0.01f)
-            {
-                rb.linearVelocity *= mult;
+                var existing = __instance.GetComponent<ProjectileSpeedScaler>();
+                if (existing == null)
+                {
+                    __instance.gameObject.AddComponent<ProjectileSpeedScaler>();
+                }
+                _projectilesWithScaler.Add(id);
             }
         }
 
