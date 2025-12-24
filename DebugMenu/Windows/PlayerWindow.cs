@@ -72,7 +72,7 @@ namespace SilksongManager.DebugMenu.Windows
             DebugMenuStyles.DrawSectionHeader("TOGGLES");
 
             GUILayout.BeginHorizontal();
-            bool isInvincible = pd.isInvincible;
+            bool isInvincible = Player.CheatSystem.UserInvincible;
             if (DebugMenuStyles.DrawToggleButton(isInvincible ? "Invincibility ✓" : "Invincibility", isInvincible))
             {
                 Player.PlayerActions.ToggleInvincibility();

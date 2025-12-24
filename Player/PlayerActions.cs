@@ -67,20 +67,11 @@ namespace SilksongManager.Player
         }
 
         /// <summary>
-        /// Toggle player invincibility.
+        /// Toggle player invincibility (user-controlled, persists).
         /// </summary>
         public static void ToggleInvincibility()
         {
-            var pd = Plugin.PD;
-
-            if (pd == null)
-            {
-                Plugin.Log.LogWarning("Cannot toggle invincibility: not in game.");
-                return;
-            }
-
-            pd.isInvincible = !pd.isInvincible;
-            Plugin.Log.LogInfo($"Invincibility: {(pd.isInvincible ? "ON" : "OFF")}");
+            CheatSystem.ToggleUserInvincible();
         }
 
         /// <summary>

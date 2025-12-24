@@ -247,11 +247,24 @@ namespace SilksongManager.Player
             if (rb == null) return;
 
             float speed = 15f;
-            float h = Input.GetAxis("Horizontal");
-            float v = Input.GetAxis("Vertical");
 
-            if (Input.GetKey(KeyCode.LeftShift))
+            // Check for shift (both left and right)
+            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
                 speed = 30f;
+
+            // Use raw key input to bypass game's input system that may block horizontal during shift
+            float h = 0f;
+            float v = 0f;
+
+            if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A))
+                h = -1f;
+            else if (Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D))
+                h = 1f;
+
+            if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W))
+                v = 1f;
+            else if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S))
+                v = -1f;
 
             rb.linearVelocity = new Vector2(h * speed, v * speed);
         }
@@ -381,7 +394,9 @@ namespace SilksongManager.Player
                     _originalGravityScale = rb.gravityScale;
                     _originalBodyType = rb.bodyType;
 
-                    rb.bodyType = RigidbodyType2D.Kinematic;
+                    // Keep Dynamic body type for trigger collision detection!
+                    // Just set gravity to zero
+                    rb.gravityScale = 0f;
                     rb.linearVelocity = Vector2.zero;
                 }
 
