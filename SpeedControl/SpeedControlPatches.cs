@@ -1,7 +1,7 @@
 using HarmonyLib;
 using UnityEngine;
 using System.Reflection;
-using HutongGames.PlayMaker.Actions;
+using System.Collections.Generic;
 
 namespace SilksongManager.SpeedControl
 {
@@ -20,6 +20,9 @@ namespace SilksongManager.SpeedControl
         private static System.Type _tk2dAnimatorType;
         private static PropertyInfo _clipFpsProperty;
         private static bool _reflectionInitialized = false;
+
+        // Track which enemies have the scaler component
+        private static HashSet<int> _enemiesWithScaler = new();
 
         #endregion
 
@@ -46,18 +49,11 @@ namespace SilksongManager.SpeedControl
                 TryPatch(typeof(NailSlash), "PlaySlash", nameof(NailSlash_PlaySlash_Postfix), ref patchCount);
                 TryPatch(typeof(Downspike), "StartSlash", nameof(Downspike_StartSlash_Postfix), ref patchCount);
 
+                // Enemy initialization - add speed scaler component
+                TryPatch(typeof(HealthManager), "OnEnable", nameof(HealthManager_OnEnable_Postfix), ref patchCount);
+
                 // Enemy projectile velocity
                 TryPatch(typeof(EnemyBullet), "OnEnable", nameof(EnemyBullet_OnEnable_Postfix), ref patchCount);
-
-                // Enemy VELOCITY scaling via PlayMaker FSM actions
-                TryPatch(typeof(SetVelocity2d), "DoSetVelocity", nameof(SetVelocity2d_DoSetVelocity_Postfix), ref patchCount);
-
-                // Walker velocity scaling
-                TryPatch(typeof(Walker), "BeginWalking", nameof(Walker_BeginWalking_Postfix), ref patchCount);
-                TryPatch(typeof(Walker), "UpdateWalking", nameof(Walker_UpdateWalking_Postfix), ref patchCount);
-
-                // Crawler velocity scaling
-                TryPatchOverload(typeof(Crawler), "StartCrawling", new[] { typeof(bool) }, nameof(Crawler_StartCrawling_Postfix), ref patchCount);
 
                 // Patch tk2d for animation speed
                 PatchTk2dAnimator(ref patchCount);
@@ -83,6 +79,7 @@ namespace SilksongManager.SpeedControl
                     var postfix = typeof(SpeedControlPatches).GetMethod(nameof(Tk2d_Play_Postfix), BindingFlags.Public | BindingFlags.Static);
                     _harmony.Patch(playString, postfix: new HarmonyMethod(postfix));
                     count++;
+                    Plugin.Log.LogInfo("SpeedControl: Patched tk2d.Play(string)");
                 }
 
                 // Patch PlayFromFrame
@@ -92,6 +89,7 @@ namespace SilksongManager.SpeedControl
                     var postfix = typeof(SpeedControlPatches).GetMethod(nameof(Tk2d_Play_Postfix), BindingFlags.Public | BindingFlags.Static);
                     _harmony.Patch(playFromFrame, postfix: new HarmonyMethod(postfix));
                     count++;
+                    Plugin.Log.LogInfo("SpeedControl: Patched tk2d.PlayFromFrame");
                 }
             }
             catch (System.Exception e)
@@ -124,23 +122,6 @@ namespace SilksongManager.SpeedControl
             }
         }
 
-        private static void TryPatchOverload(System.Type targetType, string methodName, System.Type[] args, string patchName, ref int count)
-        {
-            try
-            {
-                var original = AccessTools.Method(targetType, methodName, args);
-                if (original == null) return;
-
-                var patch = typeof(SpeedControlPatches).GetMethod(patchName, BindingFlags.Public | BindingFlags.Static);
-                if (patch == null) return;
-
-                _harmony.Patch(original, postfix: new HarmonyMethod(patch));
-                count++;
-                Plugin.Log.LogInfo($"SpeedControl: Patched {targetType.Name}.{methodName}");
-            }
-            catch { }
-        }
-
         private static void InitializeReflection()
         {
             if (_reflectionInitialized) return;
@@ -166,6 +147,7 @@ namespace SilksongManager.SpeedControl
         public static void Remove()
         {
             _harmony?.UnpatchSelf();
+            _enemiesWithScaler.Clear();
         }
 
         #endregion
@@ -201,96 +183,27 @@ namespace SilksongManager.SpeedControl
 
         #endregion
 
-        #region Velocity Scaling Patches
+        #region Enemy Patches
 
         /// <summary>
-        /// Scale velocity set by PlayMaker SetVelocity2d action.
+        /// Add EnemySpeedScaler component to enemies for velocity scaling.
         /// </summary>
-        public static void SetVelocity2d_DoSetVelocity_Postfix(SetVelocity2d __instance)
+        public static void HealthManager_OnEnable_Postfix(HealthManager __instance)
         {
-            if (!SpeedControlConfig.IsEnabled) return;
+            if (__instance == null) return;
 
-            float mult = SpeedControlConfig.EffectiveEnemyMovement;
-            if (Mathf.Approximately(mult, 1f)) return;
+            int id = __instance.gameObject.GetInstanceID();
 
-            try
+            // Add EnemySpeedScaler component if not already present
+            if (!_enemiesWithScaler.Contains(id))
             {
-                var go = __instance.Fsm.GetOwnerDefaultTarget(__instance.gameObject);
-                if (go == null) return;
-
-                // Only scale for enemies (objects with HealthManager)
-                var hm = go.GetComponentInParent<HealthManager>();
-                if (hm == null) return;
-
-                // Don't scale hero
-                if (IsHeroObject(go)) return;
-
-                var rb = go.GetComponent<Rigidbody2D>();
-                if (rb != null)
+                var existing = __instance.GetComponent<EnemySpeedScaler>();
+                if (existing == null)
                 {
-                    rb.linearVelocity *= mult;
+                    __instance.gameObject.AddComponent<EnemySpeedScaler>();
+                    Plugin.Log.LogInfo($"SpeedControl: Added scaler to {__instance.gameObject.name}");
                 }
-            }
-            catch { }
-        }
-
-        /// <summary>
-        /// Scale Walker velocity after BeginWalking sets it.
-        /// </summary>
-        public static void Walker_BeginWalking_Postfix(Walker __instance)
-        {
-            if (!SpeedControlConfig.IsEnabled) return;
-
-            float mult = SpeedControlConfig.EffectiveEnemyMovement;
-            if (Mathf.Approximately(mult, 1f)) return;
-
-            var rb = __instance.GetComponent<Rigidbody2D>();
-            if (rb != null)
-            {
-                var vel = rb.linearVelocity;
-                rb.linearVelocity = new Vector2(vel.x * mult, vel.y);
-            }
-        }
-
-        /// <summary>
-        /// Keep Walker velocity scaled during UpdateWalking.
-        /// </summary>
-        public static void Walker_UpdateWalking_Postfix(Walker __instance)
-        {
-            if (!SpeedControlConfig.IsEnabled) return;
-
-            float mult = SpeedControlConfig.EffectiveEnemyMovement;
-            if (Mathf.Approximately(mult, 1f)) return;
-
-            var rb = __instance.GetComponent<Rigidbody2D>();
-            if (rb != null)
-            {
-                // Walker continuously sets velocity, we need to scale it
-                float targetSpeed = (__instance.walkSpeedR + Mathf.Abs(__instance.walkSpeedL)) / 2f;
-                var vel = rb.linearVelocity;
-
-                // Only scale if not already scaled
-                if (Mathf.Abs(vel.x) > 0.1f && Mathf.Abs(vel.x) < targetSpeed * mult * 1.1f)
-                {
-                    rb.linearVelocity = new Vector2(vel.x * mult, vel.y);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Scale Crawler velocity.
-        /// </summary>
-        public static void Crawler_StartCrawling_Postfix(Crawler __instance)
-        {
-            if (!SpeedControlConfig.IsEnabled) return;
-
-            float mult = SpeedControlConfig.EffectiveEnemyMovement;
-            if (Mathf.Approximately(mult, 1f)) return;
-
-            var rb = __instance.GetComponent<Rigidbody2D>();
-            if (rb != null)
-            {
-                rb.linearVelocity *= mult;
+                _enemiesWithScaler.Add(id);
             }
         }
 
@@ -389,6 +302,7 @@ namespace SilksongManager.SpeedControl
             if (rb != null && rb.linearVelocity.sqrMagnitude > 0.01f)
             {
                 rb.linearVelocity *= mult;
+                Plugin.Log.LogInfo($"SpeedControl: Scaled bullet velocity by {mult}");
             }
         }
 
@@ -451,7 +365,10 @@ namespace SilksongManager.SpeedControl
             SpeedControlManager.ApplyAllSpeeds();
         }
 
-        public static void ResetWalkerSpeeds() { }
+        public static void ResetWalkerSpeeds()
+        {
+            _enemiesWithScaler.Clear();
+        }
 
         #endregion
     }
