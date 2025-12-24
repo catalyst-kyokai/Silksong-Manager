@@ -145,6 +145,7 @@ namespace SilksongManager
             gameObject.AddComponent<UI.NotificationManager>();
             Hitbox.HitboxManager.Initialize(gameObject);
             SaveState.SaveStateManager.Initialize();
+            SpeedControl.SpeedControlManager.Initialize();
         }
 
         /// <summary>
@@ -289,19 +290,21 @@ namespace SilksongManager
         {
             if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.IncreaseGameSpeed))
             {
-                World.WorldActions.SetGameSpeed(Time.timeScale + 0.25f);
-                SilksongManager.UI.NotificationManager.Show("Game Speed", $"{Time.timeScale:F2}x");
+                float newSpeed = SpeedControl.SpeedControlConfig.GlobalSpeed + 0.25f;
+                SpeedControl.SpeedControlManager.SetGlobalSpeed(newSpeed);
+                SilksongManager.UI.NotificationManager.Show("Game Speed", $"{SpeedControl.SpeedControlConfig.GlobalSpeed:F2}x");
             }
 
             if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.DecreaseGameSpeed))
             {
-                World.WorldActions.SetGameSpeed(Mathf.Max(0.1f, Time.timeScale - 0.25f));
-                SilksongManager.UI.NotificationManager.Show("Game Speed", $"{Time.timeScale:F2}x");
+                float newSpeed = Mathf.Max(0.1f, SpeedControl.SpeedControlConfig.GlobalSpeed - 0.25f);
+                SpeedControl.SpeedControlManager.SetGlobalSpeed(newSpeed);
+                SilksongManager.UI.NotificationManager.Show("Game Speed", $"{SpeedControl.SpeedControlConfig.GlobalSpeed:F2}x");
             }
 
             if (Menu.Keybinds.ModKeybindManager.WasActionPressed(Menu.Keybinds.ModAction.ResetGameSpeed))
             {
-                World.WorldActions.SetGameSpeed(1f);
+                SpeedControl.SpeedControlManager.ResetAll();
                 SilksongManager.UI.NotificationManager.Show("Game Speed", "1.0x (Reset)");
             }
         }

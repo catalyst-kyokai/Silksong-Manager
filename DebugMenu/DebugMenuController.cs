@@ -70,6 +70,7 @@ namespace SilksongManager.DebugMenu
             _windows.Add(new CombatWindow());
             _windows.Add(new HitboxWindow());
             _windows.Add(new SaveStateWindow());
+            _windows.Add(new SpeedControlWindow());
 
             Plugin.Log.LogInfo("DebugMenuController initialized with " + _windows.Count + " windows");
         }

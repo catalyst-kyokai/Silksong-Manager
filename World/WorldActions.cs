@@ -165,17 +165,18 @@ namespace SilksongManager.World
         /// </summary>
         public static void ResumeGame()
         {
-            Time.timeScale = 1f;
+            // Use SpeedControlManager to restore the correct time scale
+            SpeedControl.SpeedControlManager.ApplyGlobalSpeed();
             Plugin.Log.LogInfo("Game resumed.");
         }
 
         /// <summary>
-        /// Set game speed.
+        /// Set game speed (deprecated - use SpeedControlManager directly).
         /// </summary>
+        [System.Obsolete("Use SpeedControl.SpeedControlManager.SetGlobalSpeed instead")]
         public static void SetGameSpeed(float speed)
         {
-            Time.timeScale = Mathf.Clamp(speed, 0f, 10f);
-            Plugin.Log.LogInfo($"Game speed set to {Time.timeScale}x");
+            SpeedControl.SpeedControlManager.SetGlobalSpeed(speed);
         }
 
         #endregion
