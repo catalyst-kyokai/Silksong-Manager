@@ -269,19 +269,8 @@ namespace SilksongManager.SpeedControl
 
             Time.timeScale = 1f;
 
-            // Reset enemy animators
-            foreach (var hm in HealthManager.EnumerateActiveEnemies())
-            {
-                if (hm == null) continue;
-                var animators = hm.GetComponentsInChildren<Animator>();
-                foreach (var anim in animators)
-                {
-                    if (anim != null) anim.speed = 1f;
-                }
-            }
-
-            // Reset environment
-            ApplyEnvironmentSpeed();
+            // Reset Walker speeds
+            SpeedControlPatches.ResetWalkerSpeeds();
 
             Plugin.Log.LogInfo("All speeds reset to 1.0x");
         }
