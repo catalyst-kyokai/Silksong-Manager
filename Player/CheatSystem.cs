@@ -240,6 +240,7 @@ namespace SilksongManager.Player
 
         /// <summary>
         /// Processes noclip movement based on input.
+        /// Uses game's input system to respect user's keybindings.
         /// </summary>
         private static void ProcessNoclipMovement(HeroController hero)
         {
@@ -248,22 +249,30 @@ namespace SilksongManager.Player
 
             float speed = 15f;
 
-            // Check for shift (both left and right)
+            // Check for shift (both left and right) for speed boost
             if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
                 speed = 30f;
 
-            // Use raw key input to bypass game's input system that may block horizontal during shift
+            // Use game's input system to respect user's keybindings
+            var inputHandler = InputHandler.Instance;
+            if (inputHandler == null || inputHandler.inputActions == null)
+            {
+                rb.linearVelocity = Vector2.zero;
+                return;
+            }
+
             float h = 0f;
             float v = 0f;
 
-            if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A))
+            // Use game's input actions (respects custom keybindings)
+            if (inputHandler.inputActions.Left.IsPressed)
                 h = -1f;
-            else if (Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D))
+            else if (inputHandler.inputActions.Right.IsPressed)
                 h = 1f;
 
-            if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W))
+            if (inputHandler.inputActions.Up.IsPressed)
                 v = 1f;
-            else if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S))
+            else if (inputHandler.inputActions.Down.IsPressed)
                 v = -1f;
 
             rb.linearVelocity = new Vector2(h * speed, v * speed);
