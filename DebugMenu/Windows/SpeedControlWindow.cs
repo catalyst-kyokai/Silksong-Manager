@@ -11,7 +11,7 @@ namespace SilksongManager.DebugMenu.Windows
     {
         #region Window Properties
 
-        public override int WindowId => 10010;
+        public override int WindowId => 10012;
         public override string Title => "Speed Control";
         protected override Vector2 DefaultSize => new Vector2(320, 520);
 

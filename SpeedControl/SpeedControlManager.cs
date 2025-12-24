@@ -19,6 +19,9 @@ namespace SilksongManager.SpeedControl
         /// <summary>Cached hero reference.</summary>
         private static HeroController _cachedHero;
 
+        /// <summary>Environment speed controller instance.</summary>
+        private static EnvironmentSpeedController _envController;
+
         #endregion
 
         #region Initialization
@@ -33,6 +36,11 @@ namespace SilksongManager.SpeedControl
             SpeedControlPatches.Apply();
             SceneManager.sceneLoaded += OnSceneLoaded;
 
+            // Create environment speed controller
+            var controllerGo = new GameObject("EnvironmentSpeedController");
+            Object.DontDestroyOnLoad(controllerGo);
+            _envController = controllerGo.AddComponent<EnvironmentSpeedController>();
+
             _initialized = true;
             Plugin.Log.LogInfo("SpeedControl system initialized");
         }
@@ -45,6 +53,13 @@ namespace SilksongManager.SpeedControl
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SpeedControlPatches.Remove();
             SpeedControlConfig.ResetAll();
+
+            if (_envController != null)
+            {
+                Object.Destroy(_envController.gameObject);
+                _envController = null;
+            }
+
             _initialized = false;
         }
 
