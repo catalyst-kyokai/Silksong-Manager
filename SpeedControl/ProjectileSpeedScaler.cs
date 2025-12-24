@@ -4,7 +4,7 @@ namespace SilksongManager.SpeedControl
 {
     /// <summary>
     /// Scales projectile velocities based on enemy attack speed.
-    /// Attached to projectiles at spawn time.
+    /// Attached to projectiles at spawn time. Handles pool reuse via OnEnable.
     /// </summary>
     public class ProjectileSpeedScaler : MonoBehaviour
     {
@@ -15,6 +15,17 @@ namespace SilksongManager.SpeedControl
         void Awake()
         {
             _rb = GetComponent<Rigidbody2D>();
+        }
+
+        void OnEnable()
+        {
+            // Reset state when object is enabled (including pool reuse)
+            _hasScaled = false;
+            _appliedMult = 1f;
+
+            // Get Rigidbody2D again in case it wasn't found in Awake (pooled objects)
+            if (_rb == null)
+                _rb = GetComponent<Rigidbody2D>();
         }
 
         void Start()
