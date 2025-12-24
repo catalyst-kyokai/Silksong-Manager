@@ -143,6 +143,11 @@ namespace SilksongManager.DebugMenu.Windows
                 _controller.ToggleWindow<WorldWindow>();
             }
 
+            if (GUILayout.Button("Speed", DebugMenuStyles.Button))
+            {
+                _controller.ToggleWindow<SpeedControlWindow>();
+            }
+
             if (GUILayout.Button("Items", DebugMenuStyles.Button))
             {
                 _controller.ToggleWindow<ItemsWindow>();
