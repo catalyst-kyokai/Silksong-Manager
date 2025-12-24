@@ -13,7 +13,7 @@ namespace SilksongManager.DebugMenu.Windows
 
         public override int WindowId => 10012;
         public override string Title => "Speed Control";
-        protected override Vector2 DefaultSize => new Vector2(340, 600);
+        protected override Vector2 DefaultSize => new Vector2(340, 520);
 
         #endregion
 
@@ -26,8 +26,6 @@ namespace SilksongManager.DebugMenu.Windows
         private string _enemyMoveInput = "1.00";
         private string _enemyAtkInput = "1.00";
         private string _enemyAllInput = "1.00";
-        private string _noclipSpeedInput = "15";
-        private string _noclipBoostInput = "30";
 
         #endregion
 
@@ -74,28 +72,13 @@ namespace SilksongManager.DebugMenu.Windows
 
             GUILayout.Space(15);
 
-            // Noclip Speed Section
-            DebugMenuStyles.DrawSectionHeader("NOCLIP SPEED");
-            DrawSpeedInput("Normal Speed", ref _noclipSpeedInput,
-                () => Player.CheatSystem.NoclipSpeed,
-                v => Player.CheatSystem.NoclipSpeed = v,
-                0.1f, 10f);
-            DrawSpeedInput("Boost Speed", ref _noclipBoostInput,
-                () => Player.CheatSystem.NoclipBoostSpeed,
-                v => Player.CheatSystem.NoclipBoostSpeed = v,
-                0.1f, 10f);
-
-            GUILayout.Space(15);
-
             // Reset All Button
             DebugMenuStyles.DrawSeparator();
             if (GUILayout.Button("RESET ALL TO 1.0x", DebugMenuStyles.Button))
             {
                 SpeedControl.SpeedControlManager.ResetAll();
-                Player.CheatSystem.NoclipSpeed = 15f;
-                Player.CheatSystem.NoclipBoostSpeed = 30f;
                 RefreshInputs();
-                UI.NotificationManager.Show("Speed Reset", "All speeds reset to defaults");
+                UI.NotificationManager.Show("Speed Reset", "All speeds reset to 1.0x");
             }
 
             // Status Display
@@ -181,15 +164,12 @@ namespace SilksongManager.DebugMenu.Windows
             _enemyMoveInput = SpeedControl.SpeedControlConfig.EnemyMovementSpeed.ToString("F2");
             _enemyAtkInput = SpeedControl.SpeedControlConfig.EnemyAttackSpeed.ToString("F2");
             _enemyAllInput = SpeedControl.SpeedControlConfig.EnemyAllSpeed.ToString("F2");
-            _noclipSpeedInput = Player.CheatSystem.NoclipSpeed.ToString("F0");
-            _noclipBoostInput = Player.CheatSystem.NoclipBoostSpeed.ToString("F0");
         }
 
         private void DrawStatusDisplay()
         {
             GUILayout.Label("Current Status:", DebugMenuStyles.LabelBold);
             GUILayout.Label($"Time Scale: {Time.timeScale:F2}x", DebugMenuStyles.Label);
-            GUILayout.Label($"Noclip: {(Player.CheatSystem.NoclipEnabled ? "ON" : "OFF")}", DebugMenuStyles.Label);
         }
 
         #endregion

@@ -13,7 +13,7 @@ namespace SilksongManager.DebugMenu.Windows
 
         public override int WindowId => 10002;
         public override string Title => "Player";
-        protected override Vector2 DefaultSize => new Vector2(280, 350);
+        protected override Vector2 DefaultSize => new Vector2(280, 420);
 
         #endregion
 
@@ -23,6 +23,10 @@ namespace SilksongManager.DebugMenu.Windows
         private int _healthInput = 10;
         /// <summary>Silk value input (unused, kept for future).</summary>
         private int _silkInput = 10;
+        /// <summary>Noclip normal speed input.</summary>
+        private string _noclipSpeedInput = "15";
+        /// <summary>Noclip boost speed input.</summary>
+        private string _noclipBoostInput = "30";
 
         #endregion
 
@@ -88,6 +92,29 @@ namespace SilksongManager.DebugMenu.Windows
             }
             DrawKeybindHint(ModAction.ToggleNoclip);
             GUILayout.EndHorizontal();
+
+            // Noclip Speed Settings (only show when noclip is enabled or always for discoverability)
+            if (isNoclip)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("  Speed:", DebugMenuStyles.Label, GUILayout.Width(55));
+                string newSpeedInput = GUILayout.TextField(_noclipSpeedInput, DebugMenuStyles.TextField, GUILayout.Width(40));
+                if (newSpeedInput != _noclipSpeedInput)
+                {
+                    _noclipSpeedInput = newSpeedInput;
+                    if (float.TryParse(newSpeedInput, out float val) && val > 0)
+                        Player.CheatSystem.NoclipSpeed = val;
+                }
+                GUILayout.Label("  Boost:", DebugMenuStyles.Label, GUILayout.Width(45));
+                string newBoostInput = GUILayout.TextField(_noclipBoostInput, DebugMenuStyles.TextField, GUILayout.Width(40));
+                if (newBoostInput != _noclipBoostInput)
+                {
+                    _noclipBoostInput = newBoostInput;
+                    if (float.TryParse(newBoostInput, out float val) && val > 0)
+                        Player.CheatSystem.NoclipBoostSpeed = val;
+                }
+                GUILayout.EndHorizontal();
+            }
 
             GUILayout.BeginHorizontal();
             bool infiniteJumps = Player.CheatSystem.InfiniteJumps;
