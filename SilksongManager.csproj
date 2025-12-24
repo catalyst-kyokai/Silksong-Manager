@@ -61,10 +61,6 @@
       <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="UnityEngine.ParticleSystemModule">
-      <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\UnityEngine.ParticleSystemModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
     <Reference Include="UnityEngine.UIElementsModule">
       <HintPath>$(GamePath)\Hollow Knight Silksong_Data\Managed\UnityEngine.UIElementsModule.dll</HintPath>
       <Private>false</Private>

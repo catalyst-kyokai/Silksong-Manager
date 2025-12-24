@@ -376,12 +376,7 @@ namespace SilksongManager.SpeedControl
                 bool isEnemy = IsEnemyObject(go);
                 if (!isEnemy)
                 {
-                    // Environment animation
-                    float envMult = SpeedControlConfig.EnvironmentSpeed;
-                    if (!Mathf.Approximately(envMult, 1f))
-                    {
-                        ApplyFpsMult(animator, envMult);
-                    }
+                    // Non-enemy/hero objects - don't modify speed
                     return;
                 }
 

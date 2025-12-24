@@ -52,13 +52,6 @@ namespace SilksongManager.SpeedControl
 
         #endregion
 
-        #region Environment Speed
-
-        /// <summary>Environment speed multiplier (particles, platforms, effects).</summary>
-        public static float EnvironmentSpeed { get; set; } = 1f;
-
-        #endregion
-
         #region State
 
         /// <summary>Whether speed control system is active.</summary>
@@ -89,7 +82,6 @@ namespace SilksongManager.SpeedControl
             EnemyMovementSpeed = 1f;
             EnemyAttackSpeed = 1f;
             EnemyAllSpeed = 1f;
-            EnvironmentSpeed = 1f;
         }
 
         /// <summary>
@@ -103,8 +95,7 @@ namespace SilksongManager.SpeedControl
                    PlayerAllSpeed != 1f ||
                    EnemyMovementSpeed != 1f ||
                    EnemyAttackSpeed != 1f ||
-                   EnemyAllSpeed != 1f ||
-                   EnvironmentSpeed != 1f;
+                   EnemyAllSpeed != 1f;
         }
 
         #endregion

@@ -23,6 +23,8 @@ namespace SilksongManager.Player
         private static bool _infiniteSilk = false;
         /// <summary>Whether noclip mode is enabled.</summary>
         private static bool _noclipEnabled = false;
+        /// <summary>Whether user explicitly enabled invincibility.</summary>
+        private static bool _userInvincible = false;
 
         #endregion
 
@@ -32,8 +34,6 @@ namespace SilksongManager.Player
         private static float _originalGravityScale = 1f;
         /// <summary>Original body type before noclip was enabled.</summary>
         private static RigidbodyType2D _originalBodyType;
-        /// <summary>Whether player was invincible before noclip.</summary>
-        private static bool _wasInvincible = false;
         /// <summary>Collider enabled states before noclip.</summary>
         private static Dictionary<Collider2D, bool> _colliderStates = new Dictionary<Collider2D, bool>();
 
@@ -65,6 +65,8 @@ namespace SilksongManager.Player
         private static ConfigEntry<bool> _infiniteHealthConfig;
         /// <summary>Config entry for infinite silk persistence.</summary>
         private static ConfigEntry<bool> _infiniteSilkConfig;
+        /// <summary>Config entry for user invincibility persistence.</summary>
+        private static ConfigEntry<bool> _userInvincibleConfig;
 
         #endregion
 
@@ -78,6 +80,8 @@ namespace SilksongManager.Player
         public static bool InfiniteSilk => _infiniteSilk;
         /// <summary>Gets whether noclip mode is currently enabled.</summary>
         public static bool NoclipEnabled => _noclipEnabled;
+        /// <summary>Gets whether user explicitly enabled invincibility.</summary>
+        public static bool UserInvincible => _userInvincible;
 
         #endregion
 
@@ -92,10 +96,12 @@ namespace SilksongManager.Player
             _infiniteJumpsConfig = config.Bind("Cheats", "InfiniteJumps", false, "Enable infinite jumps");
             _infiniteHealthConfig = config.Bind("Cheats", "InfiniteHealth", false, "Enable infinite health");
             _infiniteSilkConfig = config.Bind("Cheats", "InfiniteSilk", false, "Enable infinite silk");
+            _userInvincibleConfig = config.Bind("Cheats", "UserInvincible", false, "User-enabled invincibility");
 
             _infiniteJumps = _infiniteJumpsConfig.Value;
             _infiniteHealth = _infiniteHealthConfig.Value;
             _infiniteSilk = _infiniteSilkConfig.Value;
+            _userInvincible = _userInvincibleConfig.Value;
 
             InitializeReflection();
         }
@@ -166,6 +172,12 @@ namespace SilksongManager.Player
             else
             {
                 _lastSilk = pd.silk;
+            }
+
+            // Force invincibility if user enabled it
+            if (_userInvincible)
+            {
+                pd.isInvincible = true;
             }
 
             // Noclip movement
@@ -322,6 +334,34 @@ namespace SilksongManager.Player
             }
         }
 
+        public static void ToggleUserInvincible()
+        {
+            _userInvincible = !_userInvincible;
+            if (_userInvincibleConfig != null)
+                _userInvincibleConfig.Value = _userInvincible;
+
+            var pd = Plugin.PD;
+            if (pd != null)
+            {
+                pd.isInvincible = _userInvincible;
+            }
+
+            Plugin.Log.LogInfo($"User Invincible: {(_userInvincible ? "ON" : "OFF")}");
+        }
+
+        public static void SetUserInvincible(bool value)
+        {
+            _userInvincible = value;
+            if (_userInvincibleConfig != null)
+                _userInvincibleConfig.Value = value;
+
+            var pd = Plugin.PD;
+            if (pd != null)
+            {
+                pd.isInvincible = value;
+            }
+        }
+
         public static void ToggleNoclip()
         {
             var hero = Plugin.Hero;
@@ -345,18 +385,21 @@ namespace SilksongManager.Player
                     rb.linearVelocity = Vector2.zero;
                 }
 
-                // Save and disable colliders
+                // Save and disable colliders (except triggers for scene transitions)
                 _colliderStates.Clear();
                 foreach (var col in colliders)
                 {
                     _colliderStates[col] = col.enabled;
-                    col.enabled = false;
+                    // Keep trigger colliders enabled for scene transitions!
+                    if (!col.isTrigger)
+                    {
+                        col.enabled = false;
+                    }
                 }
 
-                // Make invincible
+                // Make invincible during noclip
                 if (pd != null)
                 {
-                    _wasInvincible = pd.isInvincible;
                     pd.isInvincible = true;
                 }
             }
@@ -384,10 +427,10 @@ namespace SilksongManager.Player
                 }
                 _colliderStates.Clear();
 
-                // Restore invincibility state
-                if (pd != null)
+                // Restore invincibility state - ONLY if user didn't explicitly enable it
+                if (pd != null && !_userInvincible)
                 {
-                    pd.isInvincible = _wasInvincible;
+                    pd.isInvincible = false;
                 }
             }
 

@@ -19,9 +19,6 @@ namespace SilksongManager.SpeedControl
         /// <summary>Cached hero reference.</summary>
         private static HeroController _cachedHero;
 
-        /// <summary>Environment speed controller instance.</summary>
-        private static EnvironmentSpeedController _envController;
-
         #endregion
 
         #region Initialization
@@ -36,11 +33,6 @@ namespace SilksongManager.SpeedControl
             SpeedControlPatches.Apply();
             SceneManager.sceneLoaded += OnSceneLoaded;
 
-            // Create environment speed controller
-            var controllerGo = new GameObject("EnvironmentSpeedController");
-            Object.DontDestroyOnLoad(controllerGo);
-            _envController = controllerGo.AddComponent<EnvironmentSpeedController>();
-
             _initialized = true;
             Plugin.Log.LogInfo("SpeedControl system initialized");
         }
@@ -53,13 +45,6 @@ namespace SilksongManager.SpeedControl
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SpeedControlPatches.Remove();
             SpeedControlConfig.ResetAll();
-
-            if (_envController != null)
-            {
-                Object.Destroy(_envController.gameObject);
-                _envController = null;
-            }
-
             _initialized = false;
         }
 
@@ -231,94 +216,6 @@ namespace SilksongManager.SpeedControl
 
         #endregion
 
-        #region Environment Speed
-
-        /// <summary>
-        /// Set environment speed (particles, platforms, effects).
-        /// </summary>
-        public static void SetEnvironmentSpeed(float speed)
-        {
-            SpeedControlConfig.EnvironmentSpeed = Mathf.Clamp(speed, 0.1f, 10f);
-            ApplyEnvironmentSpeed();
-            Plugin.Log.LogInfo($"Environment speed set to {speed:F2}x");
-        }
-
-        /// <summary>
-        /// Apply environment speed to animations and other elements.
-        /// </summary>
-        public static void ApplyEnvironmentSpeed()
-        {
-            if (!SpeedControlConfig.IsEnabled) return;
-
-            float mult = SpeedControlConfig.EnvironmentSpeed;
-            if (Mathf.Approximately(mult, 1f)) return;
-
-            // Apply to Unity Animators not on hero/enemies
-            var animators = Object.FindObjectsByType<Animator>(FindObjectsSortMode.None);
-            foreach (var anim in animators)
-            {
-                if (anim == null) continue;
-                if (IsHeroOrEnemy(anim.gameObject)) continue;
-
-                anim.speed = mult;
-            }
-
-            // Apply to tk2dSpriteAnimators via reflection
-            ApplyTk2dEnvironmentSpeed(mult);
-        }
-
-        /// <summary>
-        /// Apply environment speed to all tk2d animators (except hero and enemies).
-        /// </summary>
-        private static void ApplyTk2dEnvironmentSpeed(float mult)
-        {
-            try
-            {
-                // Find tk2d type via reflection
-                System.Type tk2dType = null;
-                foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    tk2dType = asm.GetType("tk2dSpriteAnimator");
-                    if (tk2dType != null) break;
-                }
-
-                if (tk2dType == null) return;
-
-                var clipFpsProp = tk2dType.GetProperty("ClipFps");
-                if (clipFpsProp == null) return;
-
-                // Find all tk2d animators in scene
-                var allTk2d = Object.FindObjectsByType(tk2dType, FindObjectsSortMode.None);
-                foreach (var anim in allTk2d)
-                {
-                    if (anim == null) continue;
-
-                    var component = anim as Component;
-                    if (component == null) continue;
-
-                    // Skip hero and enemies
-                    if (IsHeroOrEnemy(component.gameObject)) continue;
-
-                    try
-                    {
-                        float currentFps = (float)clipFpsProp.GetValue(anim);
-                        // Only apply if non-zero and not already modified
-                        if (currentFps > 0)
-                        {
-                            clipFpsProp.SetValue(anim, currentFps * mult);
-                        }
-                    }
-                    catch { }
-                }
-            }
-            catch (System.Exception e)
-            {
-                Plugin.Log.LogError($"ApplyTk2dEnvironmentSpeed failed: {e.Message}");
-            }
-        }
-
-        #endregion
-
         #region Utility Methods
 
         /// <summary>
@@ -355,7 +252,6 @@ namespace SilksongManager.SpeedControl
             ApplyGlobalSpeed();
             ApplyPlayerSpeed();
             ApplyEnemyAnimatorSpeed();
-            ApplyEnvironmentSpeed();
         }
 
         /// <summary>

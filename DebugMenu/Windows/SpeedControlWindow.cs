@@ -83,17 +83,6 @@ namespace SilksongManager.DebugMenu.Windows
                 SpeedControl.SpeedControlManager.SetEnemyAllSpeed(newEnemyAll);
             }
 
-            GUILayout.Space(10);
-
-            // Environment Speed Section
-            DebugMenuStyles.DrawSectionHeader("ENVIRONMENT SPEED");
-            float envSpeed = SpeedControl.SpeedControlConfig.EnvironmentSpeed;
-            float newEnvSpeed = DrawSpeedSlider("Environment", envSpeed, 0.1f, 5f);
-            if (newEnvSpeed != envSpeed)
-            {
-                SpeedControl.SpeedControlManager.SetEnvironmentSpeed(newEnvSpeed);
-            }
-
             GUILayout.Space(15);
 
             // Reset All Button
