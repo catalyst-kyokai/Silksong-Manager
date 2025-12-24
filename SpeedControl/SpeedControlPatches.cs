@@ -65,6 +65,9 @@ namespace SilksongManager.SpeedControl
                 TryPatch(typeof(NailSlash), "PlaySlash", nameof(NailSlash_PlaySlash_Postfix), ref patchCount);
                 TryPatch(typeof(Downspike), "StartSlash", nameof(Downspike_StartSlash_Postfix), ref patchCount);
 
+                // Player attack cooldown scaling - patch getters
+                PatchAttackCooldowns(ref patchCount);
+
                 // Universal spawned object velocity scaling - patches ObjectPool.Spawn
                 PatchObjectPoolSpawn(ref patchCount);
 
@@ -173,6 +176,46 @@ namespace SilksongManager.SpeedControl
             catch (System.Exception e)
             {
                 Plugin.Log.LogError($"SpeedControl: ObjectPool.Spawn patch failed: {e.Message}");
+            }
+        }
+
+        private static void PatchAttackCooldowns(ref int count)
+        {
+            try
+            {
+                // Patch AttackCooldownTime getter
+                var cooldownGetter = AccessTools.PropertyGetter(typeof(HeroControllerConfig), "AttackCooldownTime");
+                if (cooldownGetter != null)
+                {
+                    var postfix = typeof(SpeedControlPatches).GetMethod(nameof(AttackCooldownTime_Postfix), BindingFlags.Public | BindingFlags.Static);
+                    _harmony.Patch(cooldownGetter, postfix: new HarmonyMethod(postfix));
+                    count++;
+                    Plugin.Log.LogInfo("SpeedControl: Patched AttackCooldownTime");
+                }
+
+                // Patch QuickAttackCooldownTime getter
+                var quickCooldownGetter = AccessTools.PropertyGetter(typeof(HeroControllerConfig), "QuickAttackCooldownTime");
+                if (quickCooldownGetter != null)
+                {
+                    var postfix = typeof(SpeedControlPatches).GetMethod(nameof(AttackCooldownTime_Postfix), BindingFlags.Public | BindingFlags.Static);
+                    _harmony.Patch(quickCooldownGetter, postfix: new HarmonyMethod(postfix));
+                    count++;
+                    Plugin.Log.LogInfo("SpeedControl: Patched QuickAttackCooldownTime");
+                }
+
+                // Patch AttackRecoveryTime getter
+                var recoveryGetter = AccessTools.PropertyGetter(typeof(HeroControllerConfig), "AttackRecoveryTime");
+                if (recoveryGetter != null)
+                {
+                    var postfix = typeof(SpeedControlPatches).GetMethod(nameof(AttackCooldownTime_Postfix), BindingFlags.Public | BindingFlags.Static);
+                    _harmony.Patch(recoveryGetter, postfix: new HarmonyMethod(postfix));
+                    count++;
+                    Plugin.Log.LogInfo("SpeedControl: Patched AttackRecoveryTime");
+                }
+            }
+            catch (System.Exception e)
+            {
+                Plugin.Log.LogError($"SpeedControl: Attack cooldown patches failed: {e.Message}");
             }
         }
 
@@ -488,6 +531,21 @@ namespace SilksongManager.SpeedControl
             if (Mathf.Approximately(mult, 1f)) return;
 
             ApplyTk2dSpeedMultiplier(__instance.gameObject, mult);
+        }
+
+        /// <summary>
+        /// Scale attack cooldown times inversely with attack speed.
+        /// Higher attack speed = shorter cooldowns.
+        /// </summary>
+        public static void AttackCooldownTime_Postfix(ref float __result)
+        {
+            if (!SpeedControlConfig.IsEnabled) return;
+
+            float mult = SpeedControlConfig.EffectivePlayerAttack;
+            if (Mathf.Approximately(mult, 1f)) return;
+
+            // Divide by multiplier - if attack speed is 2x, cooldown is halved
+            __result = __result / mult;
         }
 
         #endregion
