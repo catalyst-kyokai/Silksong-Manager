@@ -192,8 +192,8 @@ namespace SilksongManager.Player
                 _lastSilk = pd.silk;
             }
 
-            // Force invincibility if user enabled it
-            if (_userInvincible)
+            // Force invincibility if user enabled it OR noclip is active
+            if (_userInvincible || _noclipEnabled)
             {
                 pd.isInvincible = true;
             }
