@@ -4,7 +4,7 @@ namespace SilksongManager.DebugMenu.Windows
 {
     /// <summary>
     /// Speed control debug window.
-    /// Provides sliders and buttons for controlling game, player, enemy, and environment speeds.
+    /// Provides manual input and buttons for controlling game, player, enemy speeds.
     /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public class SpeedControlWindow : BaseWindow
@@ -13,7 +13,21 @@ namespace SilksongManager.DebugMenu.Windows
 
         public override int WindowId => 10012;
         public override string Title => "Speed Control";
-        protected override Vector2 DefaultSize => new Vector2(320, 520);
+        protected override Vector2 DefaultSize => new Vector2(340, 600);
+
+        #endregion
+
+        #region Private Fields
+
+        private string _globalInput = "1.00";
+        private string _playerMoveInput = "1.00";
+        private string _playerAtkInput = "1.00";
+        private string _playerAllInput = "1.00";
+        private string _enemyMoveInput = "1.00";
+        private string _enemyAtkInput = "1.00";
+        private string _enemyAllInput = "1.00";
+        private string _noclipSpeedInput = "15";
+        private string _noclipBoostInput = "30";
 
         #endregion
 
@@ -23,65 +37,53 @@ namespace SilksongManager.DebugMenu.Windows
         {
             // Global Speed Section
             DebugMenuStyles.DrawSectionHeader("GLOBAL SPEED");
-            float globalSpeed = SpeedControl.SpeedControlConfig.GlobalSpeed;
-            float newGlobalSpeed = DrawSpeedSlider("Time Scale", globalSpeed, 0.1f, 5f);
-            if (newGlobalSpeed != globalSpeed)
-            {
-                SpeedControl.SpeedControlManager.SetGlobalSpeed(newGlobalSpeed);
-            }
-            DrawPresetButtonsGlobal();
+            DrawSpeedInput("Time Scale", ref _globalInput,
+                () => SpeedControl.SpeedControlConfig.GlobalSpeed,
+                v => SpeedControl.SpeedControlManager.SetGlobalSpeed(v));
+            DrawPresetButtons(new[] { 0.25f, 0.5f, 1f, 2f, 5f },
+                v => SpeedControl.SpeedControlManager.SetGlobalSpeed(v),
+                ref _globalInput);
 
             GUILayout.Space(10);
 
             // Player Speed Section
             DebugMenuStyles.DrawSectionHeader("PLAYER SPEED");
-
-            float playerMove = SpeedControl.SpeedControlConfig.PlayerMovementSpeed;
-            float newPlayerMove = DrawSpeedSlider("Movement", playerMove, 0.1f, 5f);
-            if (newPlayerMove != playerMove)
-            {
-                SpeedControl.SpeedControlManager.SetPlayerMovementSpeed(newPlayerMove);
-            }
-
-            float playerAtk = SpeedControl.SpeedControlConfig.PlayerAttackSpeed;
-            float newPlayerAtk = DrawSpeedSlider("Attack", playerAtk, 0.1f, 5f);
-            if (newPlayerAtk != playerAtk)
-            {
-                SpeedControl.SpeedControlManager.SetPlayerAttackSpeed(newPlayerAtk);
-            }
-
-            float playerAll = SpeedControl.SpeedControlConfig.PlayerAllSpeed;
-            float newPlayerAll = DrawSpeedSlider("All (Combined)", playerAll, 0.1f, 5f);
-            if (newPlayerAll != playerAll)
-            {
-                SpeedControl.SpeedControlManager.SetPlayerAllSpeed(newPlayerAll);
-            }
+            DrawSpeedInput("Movement", ref _playerMoveInput,
+                () => SpeedControl.SpeedControlConfig.PlayerMovementSpeed,
+                v => SpeedControl.SpeedControlManager.SetPlayerMovementSpeed(v));
+            DrawSpeedInput("Attack", ref _playerAtkInput,
+                () => SpeedControl.SpeedControlConfig.PlayerAttackSpeed,
+                v => SpeedControl.SpeedControlManager.SetPlayerAttackSpeed(v));
+            DrawSpeedInput("All (Combined)", ref _playerAllInput,
+                () => SpeedControl.SpeedControlConfig.PlayerAllSpeed,
+                v => SpeedControl.SpeedControlManager.SetPlayerAllSpeed(v));
 
             GUILayout.Space(10);
 
             // Enemy Speed Section
             DebugMenuStyles.DrawSectionHeader("ENEMY SPEED");
+            DrawSpeedInput("Movement", ref _enemyMoveInput,
+                () => SpeedControl.SpeedControlConfig.EnemyMovementSpeed,
+                v => SpeedControl.SpeedControlManager.SetEnemyMovementSpeed(v));
+            DrawSpeedInput("Attack", ref _enemyAtkInput,
+                () => SpeedControl.SpeedControlConfig.EnemyAttackSpeed,
+                v => SpeedControl.SpeedControlManager.SetEnemyAttackSpeed(v));
+            DrawSpeedInput("All (Combined)", ref _enemyAllInput,
+                () => SpeedControl.SpeedControlConfig.EnemyAllSpeed,
+                v => SpeedControl.SpeedControlManager.SetEnemyAllSpeed(v));
 
-            float enemyMove = SpeedControl.SpeedControlConfig.EnemyMovementSpeed;
-            float newEnemyMove = DrawSpeedSlider("Movement", enemyMove, 0.1f, 5f);
-            if (newEnemyMove != enemyMove)
-            {
-                SpeedControl.SpeedControlManager.SetEnemyMovementSpeed(newEnemyMove);
-            }
+            GUILayout.Space(15);
 
-            float enemyAtk = SpeedControl.SpeedControlConfig.EnemyAttackSpeed;
-            float newEnemyAtk = DrawSpeedSlider("Attack", enemyAtk, 0.1f, 5f);
-            if (newEnemyAtk != enemyAtk)
-            {
-                SpeedControl.SpeedControlManager.SetEnemyAttackSpeed(newEnemyAtk);
-            }
-
-            float enemyAll = SpeedControl.SpeedControlConfig.EnemyAllSpeed;
-            float newEnemyAll = DrawSpeedSlider("All (Combined)", enemyAll, 0.1f, 5f);
-            if (newEnemyAll != enemyAll)
-            {
-                SpeedControl.SpeedControlManager.SetEnemyAllSpeed(newEnemyAll);
-            }
+            // Noclip Speed Section
+            DebugMenuStyles.DrawSectionHeader("NOCLIP SPEED");
+            DrawSpeedInput("Normal Speed", ref _noclipSpeedInput,
+                () => Player.CheatSystem.NoclipSpeed,
+                v => Player.CheatSystem.NoclipSpeed = v,
+                0.1f, 10f);
+            DrawSpeedInput("Boost Speed", ref _noclipBoostInput,
+                () => Player.CheatSystem.NoclipBoostSpeed,
+                v => Player.CheatSystem.NoclipBoostSpeed = v,
+                0.1f, 10f);
 
             GUILayout.Space(15);
 
@@ -90,7 +92,10 @@ namespace SilksongManager.DebugMenu.Windows
             if (GUILayout.Button("RESET ALL TO 1.0x", DebugMenuStyles.Button))
             {
                 SpeedControl.SpeedControlManager.ResetAll();
-                UI.NotificationManager.Show("Speed Reset", "All speeds set to 1.0x");
+                Player.CheatSystem.NoclipSpeed = 15f;
+                Player.CheatSystem.NoclipBoostSpeed = 30f;
+                RefreshInputs();
+                UI.NotificationManager.Show("Speed Reset", "All speeds reset to defaults");
             }
 
             // Status Display
@@ -102,49 +107,89 @@ namespace SilksongManager.DebugMenu.Windows
 
         #region Helper Methods
 
-        private float DrawSpeedSlider(string label, float value, float min, float max)
+        private void DrawSpeedInput(string label, ref string inputField,
+            System.Func<float> getValue, System.Action<float> setValue,
+            float step = 0.1f, float largeStep = 1f)
         {
+            float currentValue = getValue();
+
             GUILayout.BeginHorizontal();
-            GUILayout.Label($"{label}: {value:F2}x", DebugMenuStyles.Label, GUILayout.Width(140));
-            float newValue = GUILayout.HorizontalSlider(value, min, max, GUILayout.ExpandWidth(true));
+            GUILayout.Label($"{label}:", DebugMenuStyles.Label, GUILayout.Width(100));
+
+            // Minus buttons
+            if (GUILayout.Button($"-{largeStep}", DebugMenuStyles.ButtonSmall, GUILayout.Width(35)))
+            {
+                float newVal = Mathf.Max(0.1f, currentValue - largeStep);
+                setValue(newVal);
+                inputField = newVal.ToString("F2");
+            }
+            if (GUILayout.Button($"-{step}", DebugMenuStyles.ButtonSmall, GUILayout.Width(35)))
+            {
+                float newVal = Mathf.Max(0.1f, currentValue - step);
+                setValue(newVal);
+                inputField = newVal.ToString("F2");
+            }
+
+            // Text input
+            string newInput = GUILayout.TextField(inputField, DebugMenuStyles.TextField, GUILayout.Width(55));
+            if (newInput != inputField)
+            {
+                inputField = newInput;
+                if (float.TryParse(newInput, out float val) && val > 0)
+                {
+                    setValue(val);
+                }
+            }
+
+            // Plus buttons
+            if (GUILayout.Button($"+{step}", DebugMenuStyles.ButtonSmall, GUILayout.Width(35)))
+            {
+                float newVal = currentValue + step;
+                setValue(newVal);
+                inputField = newVal.ToString("F2");
+            }
+            if (GUILayout.Button($"+{largeStep}", DebugMenuStyles.ButtonSmall, GUILayout.Width(35)))
+            {
+                float newVal = currentValue + largeStep;
+                setValue(newVal);
+                inputField = newVal.ToString("F2");
+            }
+
             GUILayout.EndHorizontal();
-            return newValue;
         }
 
-        private void DrawPresetButtonsGlobal()
+        private void DrawPresetButtons(float[] presets, System.Action<float> setValue, ref string inputField)
         {
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("0.25x", DebugMenuStyles.ButtonSmall))
+            foreach (float preset in presets)
             {
-                SpeedControl.SpeedControlManager.SetGlobalSpeed(0.25f);
-            }
-            if (GUILayout.Button("0.5x", DebugMenuStyles.ButtonSmall))
-            {
-                SpeedControl.SpeedControlManager.SetGlobalSpeed(0.5f);
-            }
-            if (GUILayout.Button("1x", DebugMenuStyles.ButtonSmall))
-            {
-                SpeedControl.SpeedControlManager.SetGlobalSpeed(1f);
-            }
-            if (GUILayout.Button("2x", DebugMenuStyles.ButtonSmall))
-            {
-                SpeedControl.SpeedControlManager.SetGlobalSpeed(2f);
-            }
-            if (GUILayout.Button("5x", DebugMenuStyles.ButtonSmall))
-            {
-                SpeedControl.SpeedControlManager.SetGlobalSpeed(5f);
+                if (GUILayout.Button($"{preset}x", DebugMenuStyles.ButtonSmall))
+                {
+                    setValue(preset);
+                    inputField = preset.ToString("F2");
+                }
             }
             GUILayout.EndHorizontal();
+        }
+
+        private void RefreshInputs()
+        {
+            _globalInput = SpeedControl.SpeedControlConfig.GlobalSpeed.ToString("F2");
+            _playerMoveInput = SpeedControl.SpeedControlConfig.PlayerMovementSpeed.ToString("F2");
+            _playerAtkInput = SpeedControl.SpeedControlConfig.PlayerAttackSpeed.ToString("F2");
+            _playerAllInput = SpeedControl.SpeedControlConfig.PlayerAllSpeed.ToString("F2");
+            _enemyMoveInput = SpeedControl.SpeedControlConfig.EnemyMovementSpeed.ToString("F2");
+            _enemyAtkInput = SpeedControl.SpeedControlConfig.EnemyAttackSpeed.ToString("F2");
+            _enemyAllInput = SpeedControl.SpeedControlConfig.EnemyAllSpeed.ToString("F2");
+            _noclipSpeedInput = Player.CheatSystem.NoclipSpeed.ToString("F0");
+            _noclipBoostInput = Player.CheatSystem.NoclipBoostSpeed.ToString("F0");
         }
 
         private void DrawStatusDisplay()
         {
             GUILayout.Label("Current Status:", DebugMenuStyles.LabelBold);
-
-            // Show effective values
-            string status = $"Time Scale: {Time.timeScale:F2}x";
-
-            GUILayout.Label(status, DebugMenuStyles.Label);
+            GUILayout.Label($"Time Scale: {Time.timeScale:F2}x", DebugMenuStyles.Label);
+            GUILayout.Label($"Noclip: {(Player.CheatSystem.NoclipEnabled ? "ON" : "OFF")}", DebugMenuStyles.Label);
         }
 
         #endregion

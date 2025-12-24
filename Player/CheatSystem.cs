@@ -67,6 +67,10 @@ namespace SilksongManager.Player
         private static ConfigEntry<bool> _infiniteSilkConfig;
         /// <summary>Config entry for user invincibility persistence.</summary>
         private static ConfigEntry<bool> _userInvincibleConfig;
+        /// <summary>Config entry for noclip normal speed.</summary>
+        private static ConfigEntry<float> _noclipSpeedConfig;
+        /// <summary>Config entry for noclip boost speed.</summary>
+        private static ConfigEntry<float> _noclipBoostSpeedConfig;
 
         #endregion
 
@@ -83,6 +87,20 @@ namespace SilksongManager.Player
         /// <summary>Gets whether user explicitly enabled invincibility.</summary>
         public static bool UserInvincible => _userInvincible;
 
+        /// <summary>Noclip normal movement speed.</summary>
+        public static float NoclipSpeed
+        {
+            get => _noclipSpeedConfig?.Value ?? 15f;
+            set { if (_noclipSpeedConfig != null) _noclipSpeedConfig.Value = value; }
+        }
+
+        /// <summary>Noclip boost movement speed (when holding boost key).</summary>
+        public static float NoclipBoostSpeed
+        {
+            get => _noclipBoostSpeedConfig?.Value ?? 30f;
+            set { if (_noclipBoostSpeedConfig != null) _noclipBoostSpeedConfig.Value = value; }
+        }
+
         #endregion
 
         #region Initialization
@@ -97,6 +115,8 @@ namespace SilksongManager.Player
             _infiniteHealthConfig = config.Bind("Cheats", "InfiniteHealth", false, "Enable infinite health");
             _infiniteSilkConfig = config.Bind("Cheats", "InfiniteSilk", false, "Enable infinite silk");
             _userInvincibleConfig = config.Bind("Cheats", "UserInvincible", false, "User-enabled invincibility");
+            _noclipSpeedConfig = config.Bind("Cheats", "NoclipSpeed", 15f, "Noclip normal movement speed");
+            _noclipBoostSpeedConfig = config.Bind("Cheats", "NoclipBoostSpeed", 30f, "Noclip boost movement speed");
 
             _infiniteJumps = _infiniteJumpsConfig.Value;
             _infiniteHealth = _infiniteHealthConfig.Value;
@@ -247,11 +267,11 @@ namespace SilksongManager.Player
             var rb = hero.GetComponent<Rigidbody2D>();
             if (rb == null) return;
 
-            float speed = 15f;
+            float speed = NoclipSpeed;
 
             // Check for noclip speed boost keybind (customizable in mod settings)
             if (Menu.Keybinds.ModKeybindManager.IsKeyHeld(Menu.Keybinds.ModAction.NoclipSpeedBoost))
-                speed = 30f;
+                speed = NoclipBoostSpeed;
 
             // Use game's input system to respect user's keybindings
             var inputHandler = InputHandler.Instance;
