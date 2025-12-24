@@ -229,6 +229,11 @@ namespace SilksongManager.SpeedControl
                 {
                     // Attack/other animation - use attack speed
                     mult = SpeedControlConfig.EffectiveEnemyAttack;
+                    // Debug: log attack animations to verify they're being detected
+                    if (!Mathf.Approximately(mult, 1f))
+                    {
+                        Plugin.Log.LogInfo($"SpeedControl: Attack anim '{animName}' on {go.name}, mult={mult}");
+                    }
                 }
 
                 if (!Mathf.Approximately(mult, 1f))
