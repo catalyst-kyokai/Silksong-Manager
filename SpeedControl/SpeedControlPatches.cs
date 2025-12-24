@@ -174,17 +174,31 @@ namespace SilksongManager.SpeedControl
 
         #region tk2d Animation Patches
 
+        private static int _tk2dCallCount = 0;
+
         /// <summary>
         /// Apply animation speed on Play(string) calls.
         /// Distinguishes between movement and attack animations.
         /// </summary>
         public static void Tk2d_Play_Postfix(object __instance, string name)
         {
+            _tk2dCallCount++;
+            if (_tk2dCallCount <= 10)
+            {
+                var comp = __instance as Component;
+                Plugin.Log.LogInfo($"SpeedControl: tk2d.Play called #{_tk2dCallCount}: '{name}' on {comp?.gameObject?.name ?? "null"}");
+            }
             ApplyAnimationSpeed(__instance, name);
         }
 
         public static void Tk2d_PlayFromFrame_Postfix(object __instance, string name)
         {
+            _tk2dCallCount++;
+            if (_tk2dCallCount <= 10)
+            {
+                var comp = __instance as Component;
+                Plugin.Log.LogInfo($"SpeedControl: tk2d.PlayFromFrame called #{_tk2dCallCount}: '{name}' on {comp?.gameObject?.name ?? "null"}");
+            }
             ApplyAnimationSpeed(__instance, name);
         }
 
