@@ -30,12 +30,10 @@ namespace SilksongManager.Player
 
         #region Noclip State
 
+        /// <summary>Noclip position tracking (like debug mod).</summary>
+        private static Vector3 _noclipPos;
         /// <summary>Original gravity scale before noclip was enabled.</summary>
         private static float _originalGravityScale = 1f;
-        /// <summary>Original body type before noclip was enabled.</summary>
-        private static RigidbodyType2D _originalBodyType;
-        /// <summary>Collider enabled states before noclip.</summary>
-        private static Dictionary<Collider2D, bool> _colliderStates = new Dictionary<Collider2D, bool>();
 
         #endregion
 
@@ -260,73 +258,53 @@ namespace SilksongManager.Player
 
         /// <summary>
         /// Processes noclip movement based on input.
-        /// Uses game's input system to respect user's keybindings.
-        /// Forces velocity and gravity every frame to prevent HeroController override.
+        /// Uses transform.position directly like the working debug mod.
         /// </summary>
         private static void ProcessNoclipMovement(HeroController hero)
         {
             var rb = hero.GetComponent<Rigidbody2D>();
             if (rb == null) return;
 
-            // Force gravity off every frame (HeroController may reset it)
-            rb.gravityScale = 0f;
-
-            float speed = NoclipSpeed;
-
-            // Check for noclip speed boost keybind (customizable in mod settings)
-            if (Menu.Keybinds.ModKeybindManager.IsKeyHeld(Menu.Keybinds.ModAction.NoclipSpeedBoost))
-                speed = NoclipBoostSpeed;
-
-            float h = 0f;
-            float v = 0f;
-
-            // Try game's input system first
+            // Get input handler
             var inputHandler = InputHandler.Instance;
-            bool gotInput = false;
+            if (inputHandler == null || inputHandler.inputActions == null)
+                return;
 
-            if (inputHandler != null && inputHandler.inputActions != null)
+            // Calculate speed (base or boost)
+            float baseSpeed = NoclipSpeed;
+            if (Menu.Keybinds.ModKeybindManager.IsKeyHeld(Menu.Keybinds.ModAction.NoclipSpeedBoost))
+                baseSpeed = NoclipBoostSpeed;
+
+            float distance = baseSpeed * Time.deltaTime;
+
+            // Calculate offset - SEPARATE if for each direction (not else if!)
+            // This allows diagonal movement
+            Vector3 offset = Vector3.zero;
+            if (inputHandler.inputActions.Left.IsPressed)
+                offset += Vector3.left * distance;
+            if (inputHandler.inputActions.Right.IsPressed)
+                offset += Vector3.right * distance;
+            if (inputHandler.inputActions.Up.IsPressed)
+                offset += Vector3.up * distance;
+            if (inputHandler.inputActions.Down.IsPressed)
+                offset += Vector3.down * distance;
+
+            // Update noclip position
+            _noclipPos += offset;
+
+            // Check transition state - this is KEY for scene transitions!
+            if (hero.transitionState == GlobalEnums.HeroTransitionState.WAITING_TO_TRANSITION)
             {
-                if (inputHandler.inputActions.Left.IsPressed)
-                {
-                    h = -1f;
-                    gotInput = true;
-                }
-                else if (inputHandler.inputActions.Right.IsPressed)
-                {
-                    h = 1f;
-                    gotInput = true;
-                }
-
-                if (inputHandler.inputActions.Up.IsPressed)
-                {
-                    v = 1f;
-                    gotInput = true;
-                }
-                else if (inputHandler.inputActions.Down.IsPressed)
-                {
-                    v = -1f;
-                    gotInput = true;
-                }
+                // Not transitioning - apply position directly and freeze physics
+                hero.transform.position = _noclipPos;
+                rb.constraints = rb.constraints | RigidbodyConstraints2D.FreezePosition;
             }
-
-            // Fallback to raw Unity input if game input not working
-            if (!gotInput || (h == 0f && v == 0f))
+            else
             {
-                // Check horizontal with raw input
-                if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A))
-                    h = -1f;
-                else if (Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D))
-                    h = 1f;
-
-                // Check vertical with raw input  
-                if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W))
-                    v = 1f;
-                else if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S))
-                    v = -1f;
+                // During transition - sync position and allow physics for triggers
+                _noclipPos = hero.transform.position;
+                rb.constraints = rb.constraints & ~RigidbodyConstraints2D.FreezePosition;
             }
-
-            // Force velocity (this runs every Update, overriding any HeroController changes)
-            rb.linearVelocity = new Vector2(h * speed, v * speed);
         }
 
         #endregion
@@ -448,28 +426,13 @@ namespace SilksongManager.Player
 
             if (_noclipEnabled)
             {
-                // Save original state
+                // Save current position for noclip tracking
+                _noclipPos = hero.transform.position;
+
+                // Save original gravity
                 if (rb != null)
                 {
                     _originalGravityScale = rb.gravityScale;
-                    _originalBodyType = rb.bodyType;
-
-                    // Keep Dynamic body type for trigger collision detection!
-                    // Just set gravity to zero
-                    rb.gravityScale = 0f;
-                    rb.linearVelocity = Vector2.zero;
-                }
-
-                // Save and disable colliders (except triggers for scene transitions)
-                _colliderStates.Clear();
-                foreach (var col in colliders)
-                {
-                    _colliderStates[col] = col.enabled;
-                    // Keep trigger colliders enabled for scene transitions!
-                    if (!col.isTrigger)
-                    {
-                        col.enabled = false;
-                    }
                 }
 
                 // Make invincible during noclip
@@ -480,27 +443,13 @@ namespace SilksongManager.Player
             }
             else
             {
-                // Restore original state
+                // Restore physics on disable
                 if (rb != null)
                 {
-                    rb.bodyType = _originalBodyType;
                     rb.gravityScale = _originalGravityScale;
+                    // Remove freeze constraints
+                    rb.constraints = rb.constraints & ~RigidbodyConstraints2D.FreezePosition;
                 }
-
-                // Restore colliders to their ORIGINAL state
-                foreach (var col in colliders)
-                {
-                    if (_colliderStates.TryGetValue(col, out bool wasEnabled))
-                    {
-                        col.enabled = wasEnabled;
-                    }
-                    else
-                    {
-                        // Default to enabled if we didn't track it
-                        col.enabled = true;
-                    }
-                }
-                _colliderStates.Clear();
 
                 // Restore invincibility state - ONLY if user didn't explicitly enable it
                 if (pd != null && !_userInvincible)
