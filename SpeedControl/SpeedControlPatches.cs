@@ -88,6 +88,16 @@ namespace SilksongManager.SpeedControl
 
             try
             {
+                // Patch Play() - no args
+                var playNoArgs = AccessTools.Method(_tk2dAnimatorType, "Play", System.Type.EmptyTypes);
+                if (playNoArgs != null)
+                {
+                    var postfix = typeof(SpeedControlPatches).GetMethod(nameof(Tk2d_PlayNoArgs_Postfix), BindingFlags.Public | BindingFlags.Static);
+                    _harmony.Patch(playNoArgs, postfix: new HarmonyMethod(postfix));
+                    count++;
+                    Plugin.Log.LogInfo("SpeedControl: Patched tk2d.Play()");
+                }
+
                 // Patch Play(string)
                 var playString = AccessTools.Method(_tk2dAnimatorType, "Play", new[] { typeof(string) });
                 if (playString != null)
@@ -96,6 +106,29 @@ namespace SilksongManager.SpeedControl
                     _harmony.Patch(playString, postfix: new HarmonyMethod(postfix));
                     count++;
                     Plugin.Log.LogInfo("SpeedControl: Patched tk2d.Play(string)");
+                }
+
+                // Patch Play(tk2dSpriteAnimationClip)
+                if (_tk2dClipType != null)
+                {
+                    var playClip = AccessTools.Method(_tk2dAnimatorType, "Play", new[] { _tk2dClipType });
+                    if (playClip != null)
+                    {
+                        var postfix = typeof(SpeedControlPatches).GetMethod(nameof(Tk2d_PlayClip_Postfix), BindingFlags.Public | BindingFlags.Static);
+                        _harmony.Patch(playClip, postfix: new HarmonyMethod(postfix));
+                        count++;
+                        Plugin.Log.LogInfo("SpeedControl: Patched tk2d.Play(clip)");
+                    }
+
+                    // Patch Play(tk2dSpriteAnimationClip, float, float)
+                    var playClipFps = AccessTools.Method(_tk2dAnimatorType, "Play", new[] { _tk2dClipType, typeof(float), typeof(float) });
+                    if (playClipFps != null)
+                    {
+                        var postfix = typeof(SpeedControlPatches).GetMethod(nameof(Tk2d_PlayClipFps_Postfix), BindingFlags.Public | BindingFlags.Static);
+                        _harmony.Patch(playClipFps, postfix: new HarmonyMethod(postfix));
+                        count++;
+                        Plugin.Log.LogInfo("SpeedControl: Patched tk2d.Play(clip,float,float)");
+                    }
                 }
 
                 // Patch PlayFromFrame
@@ -145,6 +178,19 @@ namespace SilksongManager.SpeedControl
                     if (_tk2dAnimatorType != null)
                     {
                         _tk2dClipType = asm.GetType("tk2dSpriteAnimationClip");
+                        Plugin.Log.LogInfo($"SpeedControl: Found tk2d type in {asm.GetName().Name}");
+
+                        // Log all Play methods
+                        var methods = _tk2dAnimatorType.GetMethods();
+                        foreach (var m in methods)
+                        {
+                            if (m.Name == "Play")
+                            {
+                                var parms = m.GetParameters();
+                                var parmStr = string.Join(", ", System.Array.ConvertAll(parms, p => p.ParameterType.Name));
+                                Plugin.Log.LogInfo($"SpeedControl: Found Play({parmStr})");
+                            }
+                        }
                         break;
                     }
                 }
@@ -177,8 +223,15 @@ namespace SilksongManager.SpeedControl
         private static int _tk2dCallCount = 0;
 
         /// <summary>
-        /// Apply animation speed on Play(string) calls.
-        /// Distinguishes between movement and attack animations.
+        /// Play() - no args, uses current clip
+        /// </summary>
+        public static void Tk2d_PlayNoArgs_Postfix(object __instance)
+        {
+            ApplyAnimationSpeedToCurrentClip(__instance);
+        }
+
+        /// <summary>
+        /// Play(string) - by name
         /// </summary>
         public static void Tk2d_Play_Postfix(object __instance, string name)
         {
@@ -189,6 +242,36 @@ namespace SilksongManager.SpeedControl
                 Plugin.Log.LogInfo($"SpeedControl: tk2d.Play called #{_tk2dCallCount}: '{name}' on {comp?.gameObject?.name ?? "null"}");
             }
             ApplyAnimationSpeed(__instance, name);
+        }
+
+        /// <summary>
+        /// Play(tk2dSpriteAnimationClip) - by clip object
+        /// </summary>
+        public static void Tk2d_PlayClip_Postfix(object __instance, object clip)
+        {
+            string clipName = GetClipName(clip);
+            _tk2dCallCount++;
+            if (_tk2dCallCount <= 10)
+            {
+                var comp = __instance as Component;
+                Plugin.Log.LogInfo($"SpeedControl: tk2d.Play(clip) called #{_tk2dCallCount}: '{clipName}' on {comp?.gameObject?.name ?? "null"}");
+            }
+            ApplyAnimationSpeed(__instance, clipName);
+        }
+
+        /// <summary>
+        /// Play(tk2dSpriteAnimationClip, float, float) - with fps
+        /// </summary>
+        public static void Tk2d_PlayClipFps_Postfix(object __instance, object clip)
+        {
+            string clipName = GetClipName(clip);
+            _tk2dCallCount++;
+            if (_tk2dCallCount <= 10)
+            {
+                var comp = __instance as Component;
+                Plugin.Log.LogInfo($"SpeedControl: tk2d.Play(clip,fps) called #{_tk2dCallCount}: '{clipName}' on {comp?.gameObject?.name ?? "null"}");
+            }
+            ApplyAnimationSpeed(__instance, clipName);
         }
 
         public static void Tk2d_PlayFromFrame_Postfix(object __instance, string name)
@@ -441,6 +524,31 @@ namespace SilksongManager.SpeedControl
 
                 float currentFps = (float)_clipFpsProperty.GetValue(animComponent);
                 _clipFpsProperty.SetValue(animComponent, currentFps * mult);
+            }
+            catch { }
+        }
+
+        private static string GetClipName(object clip)
+        {
+            if (clip == null || _clipNameField == null) return "";
+            try
+            {
+                return _clipNameField.GetValue(clip) as string ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private static void ApplyAnimationSpeedToCurrentClip(object animator)
+        {
+            if (_currentClipProperty == null) return;
+            try
+            {
+                var currentClip = _currentClipProperty.GetValue(animator);
+                string clipName = GetClipName(currentClip);
+                ApplyAnimationSpeed(animator, clipName);
             }
             catch { }
         }
