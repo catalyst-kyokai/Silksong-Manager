@@ -7,7 +7,8 @@ namespace SilksongManager.SpeedControl
 {
     /// <summary>
     /// Harmony patches for speed control.
-    /// Uses universal approach: patch physics and animations for all game objects.
+    /// Enemy Movement = animation speed only (no physics changes)
+    /// Enemy Attack = animation speed + projectile velocity
     /// Author: Catalyst (catalyst@kyokai.ru)
     /// </summary>
     public static class SpeedControlPatches
@@ -15,15 +16,15 @@ namespace SilksongManager.SpeedControl
         #region Fields
 
         private static Harmony _harmony;
-        private static Dictionary<int, float> _originalEnemySpeeds = new();
 
         // Reflection for tk2d
         private static System.Type _tk2dAnimatorType;
         private static PropertyInfo _clipFpsProperty;
-        private static PropertyInfo _currentClipProperty;
+        private static PropertyInfo _defaultFpsProperty;
         private static bool _reflectionInitialized = false;
 
-        private static bool _debugLogging = false;
+        // Track original enemy bullet speeds
+        private static Dictionary<int, float> _originalBulletSpeeds = new();
 
         #endregion
 
@@ -50,11 +51,11 @@ namespace SilksongManager.SpeedControl
                 TryPatch(typeof(NailSlash), "PlaySlash", nameof(NailSlash_PlaySlash_Postfix), ref patchCount);
                 TryPatch(typeof(Downspike), "StartSlash", nameof(Downspike_StartSlash_Postfix), ref patchCount);
 
-                // Universal enemy speed via HealthManager
+                // Enemy animation speed (applies to all enemies via tk2d)
                 TryPatch(typeof(HealthManager), "OnEnable", nameof(HealthManager_OnEnable_Postfix), ref patchCount);
 
-                // Rigidbody2D velocity scaling
-                TryPatch(typeof(Rigidbody2D), "set_linearVelocity", nameof(Rigidbody2D_SetVelocity_Prefix), ref patchCount, isPrefix: true);
+                // Enemy projectile speed
+                TryPatch(typeof(EnemyBullet), "OnEnable", nameof(EnemyBullet_OnEnable_Postfix), ref patchCount);
 
                 Plugin.Log.LogInfo($"SpeedControlPatches: {patchCount} patches applied");
             }
@@ -64,29 +65,17 @@ namespace SilksongManager.SpeedControl
             }
         }
 
-        private static void TryPatch(System.Type targetType, string methodName, string patchName, ref int count, bool isPrefix = false)
+        private static void TryPatch(System.Type targetType, string methodName, string patchName, ref int count)
         {
             try
             {
                 var original = AccessTools.Method(targetType, methodName);
-                if (original == null)
-                {
-                    if (_debugLogging) Plugin.Log.LogWarning($"SpeedControl: {targetType.Name}.{methodName} not found");
-                    return;
-                }
+                if (original == null) return;
 
                 var patch = typeof(SpeedControlPatches).GetMethod(patchName, BindingFlags.Public | BindingFlags.Static);
-                if (patch == null)
-                {
-                    if (_debugLogging) Plugin.Log.LogWarning($"SpeedControl: Patch {patchName} not found");
-                    return;
-                }
+                if (patch == null) return;
 
-                if (isPrefix)
-                    _harmony.Patch(original, prefix: new HarmonyMethod(patch));
-                else
-                    _harmony.Patch(original, postfix: new HarmonyMethod(patch));
-
+                _harmony.Patch(original, postfix: new HarmonyMethod(patch));
                 count++;
             }
             catch (System.Exception e)
@@ -110,13 +99,10 @@ namespace SilksongManager.SpeedControl
                 if (_tk2dAnimatorType != null)
                 {
                     _clipFpsProperty = _tk2dAnimatorType.GetProperty("ClipFps");
-                    _currentClipProperty = _tk2dAnimatorType.GetProperty("CurrentClip");
+                    _defaultFpsProperty = _tk2dAnimatorType.GetProperty("DefaultFps");
                 }
             }
-            catch (System.Exception e)
-            {
-                Plugin.Log.LogError($"SpeedControl reflection failed: {e.Message}");
-            }
+            catch { }
 
             _reflectionInitialized = true;
         }
@@ -124,7 +110,7 @@ namespace SilksongManager.SpeedControl
         public static void Remove()
         {
             _harmony?.UnpatchSelf();
-            _originalEnemySpeeds.Clear();
+            _originalBulletSpeeds.Clear();
         }
 
         #endregion
@@ -193,52 +179,70 @@ namespace SilksongManager.SpeedControl
             if (Mathf.Approximately(mult, 1f)) return;
 
             ApplyTk2dSpeedMultiplier(__instance.gameObject, mult);
-            if (_debugLogging) Plugin.Log.LogInfo($"SpeedControl: Applied attack speed to Downspike");
         }
 
         #endregion
 
-        #region Enemy Patches
+        #region Enemy Animation Patches
 
+        /// <summary>
+        /// When enemy activates, apply animation speed multiplier.
+        /// This affects both movement AND attack animations.
+        /// Enemy Movement = how fast they animate while moving
+        /// Enemy Attack = how fast attack animations play
+        /// Combined multiplier is the effective animation speed.
+        /// </summary>
         public static void HealthManager_OnEnable_Postfix(HealthManager __instance)
         {
             if (!SpeedControlConfig.IsEnabled) return;
 
-            // Store object ID for tracking
-            int id = __instance.gameObject.GetInstanceID();
-            if (!_originalEnemySpeeds.ContainsKey(id))
-            {
-                _originalEnemySpeeds[id] = 1f; // Mark as tracked
-            }
-
-            // Apply enemy animation speed
+            // Apply combined enemy animation speed (movement * attack for overall)
+            // For now, use attack speed for all enemy animations
             float animMult = SpeedControlConfig.EffectiveEnemyAttack;
-            if (!Mathf.Approximately(animMult, 1f))
-            {
-                ApplyTk2dSpeedMultiplierToChildren(__instance.gameObject, animMult);
-            }
+
+            // Movement affects how quickly they cycle through walk/fly anims
+            float moveMult = SpeedControlConfig.EffectiveEnemyMovement;
+
+            // Use the higher of the two (or combine them)
+            float combinedMult = Mathf.Max(animMult, moveMult);
+
+            if (Mathf.Approximately(combinedMult, 1f)) return;
+
+            ApplyTk2dSpeedToEnemy(__instance.gameObject, combinedMult);
         }
 
+        #endregion
+
+        #region Enemy Projectile Patches
+
         /// <summary>
-        /// Intercept all Rigidbody2D velocity sets and scale for enemies.
+        /// When enemy bullet spawns, scale its velocity by attack speed.
         /// </summary>
-        public static void Rigidbody2D_SetVelocity_Prefix(Rigidbody2D __instance, ref Vector2 value)
+        public static void EnemyBullet_OnEnable_Postfix(EnemyBullet __instance)
         {
             if (!SpeedControlConfig.IsEnabled) return;
 
-            float mult = SpeedControlConfig.EffectiveEnemyMovement;
+            float mult = SpeedControlConfig.EffectiveEnemyAttack;
             if (Mathf.Approximately(mult, 1f)) return;
 
-            // Check if this belongs to an enemy (has HealthManager)
-            var hm = __instance.GetComponentInParent<HealthManager>();
-            if (hm == null) return;
+            // Scale velocity on next frame (after initial velocity is set)
+            if (Plugin.Instance != null)
+            {
+                Plugin.Instance.StartCoroutine(ScaleBulletVelocity(__instance, mult));
+            }
+        }
 
-            // Don't modify hero
-            var hero = HeroController.instance;
-            if (hero != null && __instance.gameObject == hero.gameObject) return;
+        private static System.Collections.IEnumerator ScaleBulletVelocity(EnemyBullet bullet, float mult)
+        {
+            yield return null; // Wait one frame for velocity to be set
 
-            // Scale velocity
-            value = new Vector2(value.x * mult, value.y * mult);
+            if (bullet == null) yield break;
+
+            var rb = bullet.GetComponent<Rigidbody2D>();
+            if (rb != null && rb.linearVelocity.sqrMagnitude > 0.01f)
+            {
+                rb.linearVelocity *= mult;
+            }
         }
 
         #endregion
@@ -260,12 +264,13 @@ namespace SilksongManager.SpeedControl
             catch { }
         }
 
-        private static void ApplyTk2dSpeedMultiplierToChildren(GameObject go, float mult)
+        private static void ApplyTk2dSpeedToEnemy(GameObject go, float mult)
         {
             if (_tk2dAnimatorType == null || _clipFpsProperty == null) return;
 
             try
             {
+                // Apply to all tk2d animators on this enemy and children
                 var animators = go.GetComponentsInChildren(_tk2dAnimatorType, true);
                 foreach (var anim in animators)
                 {
@@ -273,7 +278,10 @@ namespace SilksongManager.SpeedControl
                     try
                     {
                         float currentFps = (float)_clipFpsProperty.GetValue(anim);
-                        _clipFpsProperty.SetValue(anim, currentFps * mult);
+                        if (currentFps > 0)
+                        {
+                            _clipFpsProperty.SetValue(anim, currentFps * mult);
+                        }
                     }
                     catch { }
                 }
@@ -289,7 +297,7 @@ namespace SilksongManager.SpeedControl
 
         public static void ResetWalkerSpeeds()
         {
-            _originalEnemySpeeds.Clear();
+            _originalBulletSpeeds.Clear();
         }
 
         #endregion
