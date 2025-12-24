@@ -261,11 +261,15 @@ namespace SilksongManager.Player
         /// <summary>
         /// Processes noclip movement based on input.
         /// Uses game's input system to respect user's keybindings.
+        /// Forces velocity and gravity every frame to prevent HeroController override.
         /// </summary>
         private static void ProcessNoclipMovement(HeroController hero)
         {
             var rb = hero.GetComponent<Rigidbody2D>();
             if (rb == null) return;
+
+            // Force gravity off every frame (HeroController may reset it)
+            rb.gravityScale = 0f;
 
             float speed = NoclipSpeed;
 
@@ -273,28 +277,55 @@ namespace SilksongManager.Player
             if (Menu.Keybinds.ModKeybindManager.IsKeyHeld(Menu.Keybinds.ModAction.NoclipSpeedBoost))
                 speed = NoclipBoostSpeed;
 
-            // Use game's input system to respect user's keybindings
-            var inputHandler = InputHandler.Instance;
-            if (inputHandler == null || inputHandler.inputActions == null)
-            {
-                rb.linearVelocity = Vector2.zero;
-                return;
-            }
-
             float h = 0f;
             float v = 0f;
 
-            // Use game's input actions (respects custom keybindings)
-            if (inputHandler.inputActions.Left.IsPressed)
-                h = -1f;
-            else if (inputHandler.inputActions.Right.IsPressed)
-                h = 1f;
+            // Try game's input system first
+            var inputHandler = InputHandler.Instance;
+            bool gotInput = false;
 
-            if (inputHandler.inputActions.Up.IsPressed)
-                v = 1f;
-            else if (inputHandler.inputActions.Down.IsPressed)
-                v = -1f;
+            if (inputHandler != null && inputHandler.inputActions != null)
+            {
+                if (inputHandler.inputActions.Left.IsPressed)
+                {
+                    h = -1f;
+                    gotInput = true;
+                }
+                else if (inputHandler.inputActions.Right.IsPressed)
+                {
+                    h = 1f;
+                    gotInput = true;
+                }
 
+                if (inputHandler.inputActions.Up.IsPressed)
+                {
+                    v = 1f;
+                    gotInput = true;
+                }
+                else if (inputHandler.inputActions.Down.IsPressed)
+                {
+                    v = -1f;
+                    gotInput = true;
+                }
+            }
+
+            // Fallback to raw Unity input if game input not working
+            if (!gotInput || (h == 0f && v == 0f))
+            {
+                // Check horizontal with raw input
+                if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A))
+                    h = -1f;
+                else if (Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D))
+                    h = 1f;
+
+                // Check vertical with raw input  
+                if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W))
+                    v = 1f;
+                else if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S))
+                    v = -1f;
+            }
+
+            // Force velocity (this runs every Update, overriding any HeroController changes)
             rb.linearVelocity = new Vector2(h * speed, v * speed);
         }
 
