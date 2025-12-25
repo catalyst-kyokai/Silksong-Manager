@@ -1,96 +1,102 @@
-# 🕷️ Silksong Manager v1.0.0.2
+# 🕷️ Silksong Manager
 
-> **The ultimate debug and utility mod for Hollow Knight: Silksong.**  
-> *Manage your game state, debug mechanics, visualize hitboxes, and customize your experience.*
-
-![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-BSD%203--Clause-green) ![Author](https://img.shields.io/badge/author-Catalyst-purple)
+> **The Ultimate Debug & Utility Suite for Hollow Knight: Silksong**  
+> *Master your environment. Analyze mechanics. Control time.*
 
 ---
 
-## ✨ Features
+## 🌟 Overview
 
-### 🎮 Player Control
-- **Invincibility**: Toggle god mode.
-- **Infinite Resources**: Infinite Silk, Health, and Jumps.
-- **Noclip**: Move freely through walls and terrain.
-- **Tools Management**: Unlock and manage all tools and crests instantly.
+**Silksong Manager** is not just a mod; it is a comprehensive command center for *Hollow Knight: Silksong*. Designed for speedrunners, modders, and deep-dive analysts, it provides unprecedented control over the game engine. From manipulating time scales to dissecting enemy AI states, managing inventory to visualizing collision geometry—if it exists in the game, you can control it.
 
-### 🌍 World & State
-- **Save/Load State**: Save your precise position and game state, then load it instantly (great for practice!).
-- **Scene Management**: Reload scenes or transition to specific levels.
-- **Game Speed**: Slow down or speed up the game for precise testing.
-- **Benchmarks**: Monitor FPS and memory usage.
-
-### 👁️ Visuals & Debugging
-- **Hitbox Visualizer**: View vivid, color-coded hitboxes for:
-    - 🟩 Player
-    - 🟥 Enemies
-    - 🟨 Attacks
-    - 🟦 Terrain & Triggers
-    - *And more!* (Toggle individual layers in the menu)
-- **Debug Info**: View detailed internal game states.
-- **Enemy Control**: Kill all enemies, freeze AI, or damage specific targets.
-
-### ⌨️ Scrollable Keybinds
-- **Fully Customizable**: Rebind any mod action to your preferred keyboard key.
-- **New UI**: Beautiful, scrollable keybinds menu that matches the game's native aesthetic.
-- **Visual Feedback**: Real-time notifications when you trigger mod actions (toggable).
+Current Version: **v1.0.0.2**
 
 ---
 
-## 🚀 Installation
+## ⚡ Core Systems
 
+### ⏳ Temporal Manipulation (Speed Control)
+Defy the game's internal clock. Silksong Manager completely rewrites the engine's time management logic.
+*   **True Global Speed**: Patches `TimeManager` and `GameManager` to ensure your speed settings persist through cutscenes, parries, and boss deaths.
+*   **Independent Scaling**: Control player and enemy speeds independently. Practice boss patterns in slow motion while keeping your character at full speed.
+*   **Freeze Frame Immunity**: The flow of time obeys *you*, not the game events.
 
-1. **Install BepInEx**: Ensure you have BepInEx 5.x installed in your *Hollow Knight: Silksong* directory.
-2. **Download**:
-   - Go to the [Releases Setup](https://github.com/catalyst-kyokai/Silksong-Manager/releases) page.
-   - Download the latest `SilksongManager.zip` (recommended) or `SilksongManager.dll`.
-3. **Install Mod**:
-   - **Method A (Archive):** Extract the contents of `SilksongManager.zip` directly into your game's root folder.
-   - **Method B (Manual):** Place `SilksongManager.dll` into:
-     `...\Hollow Knight Silksong\BepInEx\plugins\SilksongManager\`
-4. **Launch**: Start the game. The mod is active!
+### 💾 State Preservation (SaveStates)
+A robust "Time Machine" for your save files.
+*   **Deep State Capture**: Snapshots physics, FSM states (enemy logic), health, silk, and position data instantly.
+*   **Perfect Restoration**: Restores the world exactly as it was. Fixes physics glitches, resets enemy AI correctly, and refreshes the HUD instantly.
+*   **Safety Protocols**: Includes automatic collision re-detection and physics stabilization to prevent soft-locks upon loading.
 
-### 🛡️ Verify Integrity (Optional)
-To ensure your download is genuine and uncorrupted, compare the SHA256 hash of your file with the one provided in the Release notes.
+### 🎒 Inventory Management
+Complete mastery over your connection to the song.
+*   **Full Arsenal Access**: Add or remove abilities, tools, and items at will.
+*   **Crest & Rosary Control**: manipulate your currency and upgrade materials instantly.
+*   **Loadout Experimentation**: Test any charm build or tool combination immediately without grinding.
 
-**Powershell:**
-```powershell
-Get-FileHash SilksongManager.dll -Algorithm SHA256
-```
-
-
----
-
-## 📖 Usage
-
-### Opening the Menu
-Press **F1** at any time to open the **Debug Menu**. Navigate through tabs to access all features.
-
-### Default Keybinds
-| Key | Action |
-| :--- | :--- |
-| **Num 5** | Toggle Debug Menu |
-| **F5** | Save Position (Save State) |
-| **F9** | Load Position (Load State) |
-| **N** | Toggle Noclip |
-| **I** | Toggle Invincibility |
-| **J** | Toggle Infinite Jumps |
-| **K** | Kill All Enemies |
-| **F** | Freeze Enemies |
-| **G** | Add Geo |
-| **H** | Add Shell Shards |
-| **R** | Respawn |
-| **F8** | Reload Scene |
-
-*> **Note**: You can change ALL these keys in the Keybinds menu!*
+### 👁️ Analysis & Debugging
+See the world as the developers do.
+*   **Hitbox Visualization**: Render player, enemy, and terrain colliders in real-time. Understand exactly why you took damage or missed a hit.
+*   **Noclip & God Mode**: Glide through walls to explore out-of-bounds secrets. Toggle invincibility for stress-free testing.
+*   **Console & Logging**: Detailed output for tracking game events and debugging mod conflicts.
 
 ---
 
-## 🛠️ Credits & Contact
+## 🎮 Controls & Interface
 
-**Author:** Catalyst  
-**Email:** catalyst@kyokai.ru  
-**Telegram:** [@Catalyst_Kyokai](https://t.me/Catalyst_Kyokai)
+Access the **Debug Menu** at any time by pressing **F1**.
 
-Licensed under the **BSD 3-Clause License**. See `LICENSE` for details.
+### ⌨️ Default Hotkeys
+
+| Category | Action | Keybind |
+| :--- | :--- | :--- |
+| **General** | Toggle Menu | `F1` |
+| | Toggle Console | `F2` |
+| | Reload Scene | `Ctrl + R` |
+| **Movement** | Toggle Noclip | `N` |
+| | Save Position | `Z` |
+| | Load Position | `X` |
+| **Combat** | Toggle Invincibility | `I` |
+| | Instant Full Health | `H` |
+| | Kill All Enemies | `K` |
+| | Infinite Silk | `U` |
+| **Time** | Slow Down | `[` |
+| | Speed Up | `]` |
+| | Reset Speed | `\` |
+| **SaveState** | Quick Save State | `F5` |
+| | Quick Load State | `F6` |
+| **Debug** | Show Hitboxes | `Ctrl + B` |
+
+> *Note: All keybinds are fully remappable via the **Keybinds** tab in the Debug Menu.*
+
+---
+
+## �️ Installation
+
+1.  **Prerequisites**: Ensure you have a standard **BepInEx** modding setup for *Hollow Knight: Silksong*.
+2.  **Download**: Get the latest `SilksongManager.dll` or `BepInEx.zip` from the [Releases](https://github.com/catalyst-kyokai/Silksong-Manager/releases) page.
+3.  **Install**: Drop the `.dll` file into your `Silksong/BepInEx/plugins/` folder (or unpack BepInEx.zip into your game folder).
+4.  **Launch**: Start the game. The mod terminal should appear, confirming successful injection.
+
+---
+
+## 🧩 Advanced Features
+
+### Physics Stabilization
+The SaveState system uses a sophisticated "dummy scene" technique to ensure physics engines are reset correctly between loads, preventing the common "floating enemy" or "broken collision" bugs found in simpler mods.
+
+### FSM Injection
+We don't just restore variables; we inject directly into PlayMaker FSMs. This ensures that complex enemy behaviors (like the Bone Bottom crawlers or Boss phase transitions) resume naturally from where they left off.
+
+### Seamless HUD
+The HUD refresh system mimics the game's native UI update triggers, ensuring that your health bar and silk spool always reflect reality, even after complex state manipulations.
+
+---
+
+<div align="center">
+
+**Created by Catalyst**  
+*Code is Art. Control is Absolute.*
+
+[Report Issues](https://github.com/catalyst-kyokai/Silksong-Manager/issues) • [Source Code](https://github.com/catalyst-kyokai/Silksong-Manager)
+
+</div>
