@@ -1,4 +1,4 @@
-# 🕷️ Silksong Manager
+# 🕷️ Silksong Manager v1.0.0.2
 
 > **The ultimate debug and utility mod for Hollow Knight: Silksong.**  
 > *Manage your game state, debug mechanics, visualize hitboxes, and customize your experience.*
