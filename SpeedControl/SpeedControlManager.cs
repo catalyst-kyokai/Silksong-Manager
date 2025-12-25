@@ -122,15 +122,18 @@ namespace SilksongManager.SpeedControl
             var hero = Plugin.Hero;
             if (hero == null) return;
 
-            // Capture original values if not yet done
-            if (!SpeedControlConfig.OriginalsCaptured)
+            // Capture original values only ONCE (first time seeing this hero)
+            if (!SpeedControlConfig.OriginalsCaptured || SpeedControlConfig.OriginalRunSpeed <= 0)
             {
-                SpeedControlConfig.OriginalRunSpeed = hero.RUN_SPEED;
-                SpeedControlConfig.OriginalWalkSpeed = hero.WALK_SPEED;
+                // Get clean defaults from game (these should be unmodified)
+                // In HeroController, default values are typically constant
+                SpeedControlConfig.OriginalRunSpeed = 8.3f;  // Game default
+                SpeedControlConfig.OriginalWalkSpeed = 3.3f; // Game default (estimate)
                 SpeedControlConfig.OriginalsCaptured = true;
+                Plugin.Log.LogInfo($"Speed originals set: Run={SpeedControlConfig.OriginalRunSpeed}, Walk={SpeedControlConfig.OriginalWalkSpeed}");
             }
 
-            // Apply multiplier
+            // Apply multiplier to base values
             float mult = SpeedControlConfig.EffectivePlayerMovement;
             hero.RUN_SPEED = SpeedControlConfig.OriginalRunSpeed * mult;
             hero.WALK_SPEED = SpeedControlConfig.OriginalWalkSpeed * mult;
@@ -278,8 +281,8 @@ namespace SilksongManager.SpeedControl
         /// </summary>
         private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            // Reset originals capture flag for new scene
-            SpeedControlConfig.OriginalsCaptured = false;
+            // Do NOT reset OriginalsCaptured - we keep the same originals
+            // Just reapply speeds to the new hero instance
 
             // Delay application to allow scene to initialize
             if (Plugin.Instance != null)
