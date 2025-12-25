@@ -366,6 +366,57 @@ namespace SilksongManager.DebugMenu
             };
         }
 
+        /// <summary>
+        /// Draw a dropdown selector button that shows current selection.
+        /// Returns true and sets newIndex if selection changed.
+        /// </summary>
+        public static bool DrawDropdown(string[] options, int selectedIndex, out int newIndex, bool isExpanded, float width = 0)
+        {
+            newIndex = selectedIndex;
+            var options2 = width > 0 ? new[] { GUILayout.Width(width) } : new GUILayoutOption[0];
+
+            string displayText = selectedIndex >= 0 && selectedIndex < options.Length
+                ? options[selectedIndex] + " ▼"
+                : "Select... ▼";
+
+            if (GUILayout.Button(displayText, ButtonSmall, options2))
+            {
+                return true; // Signal to toggle expanded state
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Draw the dropdown list items. Call this when dropdown is expanded.
+        /// Returns true if an item was selected.
+        /// </summary>
+        public static bool DrawDropdownList(string[] options, int selectedIndex, out int newIndex, float width = 0, int maxVisible = 8)
+        {
+            newIndex = selectedIndex;
+            var listOptions = width > 0 ? new[] { GUILayout.Width(width) } : new GUILayoutOption[0];
+
+            int displayCount = Mathf.Min(options.Length, maxVisible);
+
+            for (int i = 0; i < options.Length && i < maxVisible; i++)
+            {
+                bool isSelected = i == selectedIndex;
+                var style = isSelected ? ToggleOn : ButtonSmall;
+
+                if (GUILayout.Button(options[i], style, listOptions))
+                {
+                    newIndex = i;
+                    return true;
+                }
+            }
+
+            if (options.Length > maxVisible)
+            {
+                GUILayout.Label($"... +{options.Length - maxVisible} more", LabelSmall);
+            }
+
+            return false;
+        }
+
         #endregion
     }
 }

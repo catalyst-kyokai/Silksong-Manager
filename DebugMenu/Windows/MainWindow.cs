@@ -148,9 +148,9 @@ namespace SilksongManager.DebugMenu.Windows
                 _controller.ToggleWindow<SpeedControlWindow>();
             }
 
-            if (GUILayout.Button("Items", DebugMenuStyles.Button))
+            if (GUILayout.Button("Inventory", DebugMenuStyles.Button))
             {
-                _controller.ToggleWindow<ItemsWindow>();
+                _controller.ToggleWindow<InventoryWindow>();
             }
 
             GUILayout.EndVertical();

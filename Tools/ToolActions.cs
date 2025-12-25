@@ -114,6 +114,88 @@ namespace SilksongManager.Tools
         }
 
         #endregion
+
+        #region Individual Tool Methods
+
+        /// <summary>
+        /// Unlocks a specific tool by name.
+        /// </summary>
+        /// <param name="toolName">Name of the tool to unlock.</param>
+        /// <returns>True if successful.</returns>
+        public static bool UnlockTool(string toolName)
+        {
+            var tool = ToolItemManager.GetToolByName(toolName);
+            if (tool == null)
+            {
+                Plugin.Log.LogWarning($"Tool not found: {toolName}");
+                return false;
+            }
+
+            tool.Get(true);
+            Plugin.Log.LogInfo($"Unlocked tool: {toolName}");
+            return true;
+        }
+
+        /// <summary>
+        /// Locks a specific tool by name.
+        /// </summary>
+        /// <param name="toolName">Name of the tool to lock.</param>
+        /// <returns>True if successful.</returns>
+        public static bool LockTool(string toolName)
+        {
+            var tool = ToolItemManager.GetToolByName(toolName);
+            if (tool == null)
+            {
+                Plugin.Log.LogWarning($"Tool not found: {toolName}");
+                return false;
+            }
+
+            tool.Lock();
+            Plugin.Log.LogInfo($"Locked tool: {toolName}");
+            return true;
+        }
+
+        /// <summary>
+        /// Locks all tools.
+        /// </summary>
+        public static void LockAllTools()
+        {
+            var tools = ToolItemManager.GetAllTools();
+            foreach (var tool in tools)
+            {
+                if (tool != null && tool.IsUnlocked)
+                {
+                    tool.Lock();
+                }
+            }
+            Plugin.Log.LogInfo("Locked all tools.");
+        }
+
+        /// <summary>
+        /// Gets all tools that are not crests (regular tools only).
+        /// </summary>
+        public static List<ToolInfo> GetNonCrestTools()
+        {
+            var result = new List<ToolInfo>();
+            var tools = ToolItemManager.GetAllTools();
+
+            foreach (var tool in tools)
+            {
+                if (tool == null) continue;
+
+                // Skip if this is a crest (ToolCrest inherits from ToolBase, not ToolItem directly)
+                // ToolItem is what we want
+                result.Add(new ToolInfo
+                {
+                    Name = tool.name,
+                    IsUnlocked = tool.IsUnlocked
+                });
+            }
+
+            return result;
+        }
+
+        #endregion
     }
 
     /// <summary>

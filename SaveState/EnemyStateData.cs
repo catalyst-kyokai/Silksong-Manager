@@ -128,6 +128,8 @@ namespace SilksongManager.SaveState
         public string GameObjectName;
         /// <summary>Full hierarchy path for finding the enemy on restore.</summary>
         public string GameObjectPath;
+        /// <summary>Whether the enemy GameObject was active when captured.</summary>
+        public bool IsActive = true;
 
         #endregion
 

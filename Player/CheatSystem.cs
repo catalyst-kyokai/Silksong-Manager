@@ -242,18 +242,22 @@ namespace SilksongManager.Player
         }
 
         /// <summary>
-        /// Processes infinite silk by restoring silk when decreased.
+        /// Processes infinite silk by keeping silk at maximum.
         /// </summary>
         private static void ProcessInfiniteSilk(PlayerData pd)
         {
-            if (pd.silk < _lastSilk)
+            // Only refill if below max
+            if (pd.silk < pd.silkMax)
             {
-                pd.silk = _lastSilk;
+                var hero = Plugin.Hero;
+                if (hero != null)
+                {
+                    // Use AddSilk to properly update the HUD
+                    int silkNeeded = pd.silkMax - pd.silk;
+                    hero.AddSilk(silkNeeded, heroEffect: false);
+                }
             }
-            else
-            {
-                _lastSilk = pd.silk;
-            }
+            _lastSilk = pd.silk;
         }
 
         /// <summary>

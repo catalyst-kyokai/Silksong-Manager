@@ -255,6 +255,14 @@ namespace SilksongManager.SaveState
                 Plugin.Log.LogWarning($"[DEBUG] SceneData NOT restored: instance={SceneData.instance != null}, json={!string.IsNullOrEmpty(state.SceneDataJson)}");
             }
 
+            // CRITICAL: Refresh HUD to display correct HP/Silk values
+            // Send events that HUD elements listen to for updates
+            EventRegister.SendEvent(EventRegisterEvents.HealthUpdate);
+            EventRegister.SendEvent(EventRegisterEvents.UpdateBlueHealth);
+            EventRegister.SendEvent(EventRegisterEvents.RegeneratedSilkChunk);
+            EventRegister.SendEvent(EventRegisterEvents.SilkCursedUpdate);
+            Plugin.Log.LogInfo($"[DEBUG] Sent HUD refresh events: Health={state.Health}, Silk={state.Silk}");
+
             // Reset transitions only (NOT semi-persistent items - we want to keep our restored data)
             // GameManager.instance.ResetSemiPersistentItems(); // REMOVED - this was clearing SceneData
             StaticVariableList.ClearSceneTransitions();
@@ -378,11 +386,171 @@ namespace SilksongManager.SaveState
             yield return new WaitForFixedUpdate();
             Plugin.Hero.transform.position = state.Position;
 
+            // CRITICAL: Sync physics and re-trigger enemy detection
+            // This fixes the issue where enemies with Alert Range triggers don't detect
+            // the hero after scene reload because Physics2D "forgets" trigger overlaps
+            Physics2D.SyncTransforms();
+
+            // Force a physics simulation step to re-trigger all overlaps
+            yield return new WaitForFixedUpdate();
+
+            // Re-enable enemy Alert Range colliders to force re-detection
+            // Many enemies use "Alert Range" triggers that need to re-detect the hero
+            ForceEnemyRedetection();
+
+            // CRITICAL: Force Physics2D to re-trigger OnTriggerEnter2D events
+            // Move hero FAR away and back to force Physics2D to see this as a new overlap
+            Vector3 savedPos = Plugin.Hero.transform.position;
+            Plugin.Hero.transform.position = new Vector3(9999f, 9999f, savedPos.z);
+            Physics2D.SyncTransforms();
+            yield return new WaitForFixedUpdate();
+            Plugin.Hero.transform.position = savedPos;
+            Physics2D.SyncTransforms();
+            yield return new WaitForFixedUpdate();
+            Plugin.Log.LogInfo("[DEBUG] Forced hero position reset for Physics2D collision re-detection");
+
+            // CRITICAL: Re-apply saved health/silk values AFTER scene transition!
+            // BeginSceneTransition resets health to maxHealth, so we must restore from saved state
+            Plugin.Log.LogInfo($"[DEBUG] Before restore: health={Plugin.PD.health}, silk={Plugin.PD.silk}");
+            Plugin.PD.health = state.Health;
+            Plugin.PD.silk = state.Silk;
+            Plugin.PD.geo = state.Geo;
+            Plugin.Log.LogInfo($"[DEBUG] After restore: health={Plugin.PD.health}, silk={Plugin.PD.silk}, geo={Plugin.PD.geo}");
+
+            // CRITICAL: Force HUD refresh for Health and Silk display
+            // Wait for HUD to be ready (outside try-catch since yield can't be in try-catch)
+            yield return new WaitUntil(() => GameCameras.instance?.hudCanvasSlideOut != null);
+            yield return null;
+
+            // Now do the HUD refresh (no yields allowed here)
+            try
+            {
+                // Use exact DebugMod approach: TakeHealth(1) + AddHealth(1) triggers UI refresh
+                // Net effect: health stays same (4-1+1=4) but UI gets updated
+                Plugin.Log.LogInfo($"[DEBUG] Triggering health UI update via TakeHealth/AddHealth, health={Plugin.PD.health}");
+                Plugin.Hero.TakeHealth(1);
+                Plugin.Hero.AddHealth(1);
+                Plugin.Log.LogInfo($"[DEBUG] After TakeHealth/AddHealth, health={Plugin.PD.health}");
+
+                // Clear damage effects that might have triggered
+                Plugin.Hero.ClearEffects();
+
+                // Add blue health if any was saved
+                int blueHealth = Plugin.PD.healthBlue;
+                for (int i = 0; i < blueHealth; i++)
+                {
+                    EventRegister.SendEvent("ADD BLUE HEALTH");
+                }
+
+                Plugin.Log.LogInfo($"[DEBUG] Health UI refresh completed, blueHealth={blueHealth}");
+
+                // Refresh Silk Spool display
+                if (GameCameras.instance.silkSpool != null)
+                {
+                    GameCameras.instance.silkSpool.DrawSpool();
+                    Plugin.Log.LogInfo($"[DEBUG] Called silkSpool.DrawSpool()");
+                }
+
+                // Send FSM events for additional UI updates
+                PlayMakerFSM.BroadcastEvent("CHARM INDICATOR CHECK");
+                PlayMakerFSM.BroadcastEvent("TOOL EQUIPS CHANGED");
+
+                Plugin.Log.LogInfo("[DEBUG] HUD refresh completed");
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"HUD refresh failed: {ex.Message}");
+            }
+
             // Restoring Time Scale and clearing pending state (CRITICAL for unfreezing)
             Time.timeScale = 1f;
             _pendingLoadState = null;
 
             Plugin.Log.LogInfo("Load complete!");
+        }
+
+        /// <summary>
+        /// Forces all enemies to re-detect the hero by toggling their alert range colliders.
+        /// This fixes the issue where Physics2D trigger overlaps are "forgotten" after scene reload.
+        /// </summary>
+        private static void ForceEnemyRedetection()
+        {
+            Plugin.Log.LogInfo("[DEBUG] ForceEnemyRedetection: Starting...");
+
+            var enemies = UnityEngine.Object.FindObjectsByType<HealthManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            int redetectedCount = 0;
+            int crawlersRestarted = 0;
+
+            foreach (var enemy in enemies)
+            {
+                if (enemy == null || !enemy.gameObject.activeInHierarchy) continue;
+
+                // Find all child triggers that might be used for hero detection
+                var childTriggers = enemy.GetComponentsInChildren<Collider2D>(true);
+                foreach (var trigger in childTriggers)
+                {
+                    // Look for Alert Range, Wake Range, Attack Range type triggers
+                    string name = trigger.gameObject.name.ToLower();
+                    if ((name.Contains("alert") || name.Contains("wake") || name.Contains("range") ||
+                         name.Contains("detect") || name.Contains("sense")) && trigger.isTrigger)
+                    {
+                        // Toggle the collider to force Physics2D to re-check overlaps
+                        bool wasEnabled = trigger.enabled;
+                        trigger.enabled = false;
+                        trigger.enabled = wasEnabled;
+                        redetectedCount++;
+                    }
+                }
+
+                // Restart Crawler components - they need their coroutine running for movement
+                var crawler = enemy.GetComponent<Crawler>();
+                if (crawler != null && crawler.enabled)
+                {
+                    try
+                    {
+                        // Stop and restart crawling to reinitialize the coroutine
+                        crawler.StopCrawling();
+                        crawler.StartCrawling();
+                        crawlersRestarted++;
+                        Plugin.Log.LogInfo($"[DEBUG] Restarted Crawler on {enemy.gameObject.name}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Plugin.Log.LogWarning($"Failed to restart Crawler on {enemy.gameObject.name}: {ex.Message}");
+                    }
+                }
+
+                // Also send a FINISHED event to enemy FSMs to help them re-initialize
+                var fsms = enemy.GetComponents<PlayMakerFSM>();
+                foreach (var fsm in fsms)
+                {
+                    if (fsm.FsmName == "Control" && fsm.enabled)
+                    {
+                        // Try to send FINISHED event which many FSMs use to re-evaluate
+                        fsm.SendEvent("FINISHED");
+                    }
+                }
+
+                // Toggle DamageHero component to force re-detection of collision with hero
+                // DamageHero uses OnTriggerStay2D/OnCollisionStay2D - need to re-register
+                var damageHero = enemy.GetComponent<DamageHero>();
+                if (damageHero != null && damageHero.enabled)
+                {
+                    damageHero.enabled = false;
+                    damageHero.enabled = true;
+                    Plugin.Log.LogInfo($"[DEBUG] Toggled DamageHero on {enemy.gameObject.name}");
+                }
+
+                // Toggle main collider to force physics re-registration
+                var mainCollider = enemy.GetComponent<Collider2D>();
+                if (mainCollider != null && mainCollider.enabled)
+                {
+                    mainCollider.enabled = false;
+                    mainCollider.enabled = true;
+                }
+            }
+
+            Plugin.Log.LogInfo($"[DEBUG] ForceEnemyRedetection: Toggled {redetectedCount} alert triggers, restarted {crawlersRestarted} crawlers");
         }
 
 
@@ -418,14 +586,68 @@ namespace SilksongManager.SaveState
                 if (state.FacingRight) hero.FaceRight();
                 else hero.FaceLeft();
 
-                // Explicitly invoke FinishedEnteringScene to clear flags
+                // CRITICAL: Reset transition and damage state flags
+                hero.cState.transitioning = false;
+                hero.cState.dead = false;
+                hero.cState.hazardDeath = false;
+                hero.cState.recoiling = false;
+                hero.cState.shadowDashing = false;
+                hero.transitionState = HeroTransitionState.WAITING_TO_TRANSITION;
+
+                // Reset damageMode to FULL_DAMAGE (this is what FinishedEnteringScene does)
+                hero.SetDamageMode(DamageMode.FULL_DAMAGE);
+
+                // CRITICAL: Reset HeroBox.Inactive - this static flag blocks ALL damage!
+                // HeroBox checks this in OnTriggerEnter2D/OnTriggerStay2D
+                HeroBox.Inactive = false;
+                Plugin.Log.LogInfo("[DEBUG] Reset HeroBox.Inactive = false");
+
+                // CRITICAL: Clear ALL invulnerability sources that block CanTakeDamage()
+                // cState.Invulnerable returns true if invulnerable OR invulnerableCount > 0
+                hero.cState.invulnerable = false;
+                hero.cState.ClearInvulnerabilitySources();
+                Plugin.Log.LogInfo("[DEBUG] Cleared cState invulnerability sources");
+
+                // CRITICAL: Clear static HeroInvincibilitySource - blocks CanTakeDamage()!
+                HeroInvincibilitySource.Clear();
+                Plugin.Log.LogInfo($"[DEBUG] HeroInvincibilitySource.Clear(), IsActive={HeroInvincibilitySource.IsActive}");
+
+                // Also reset parryInvulnTimer which blocks damage from enemies
+                hero.parryInvulnTimer = 0f;
+
+                // Reset downspikeInvulnerabilitySteps
+                hero.cState.downspikeInvulnerabilitySteps = 0;
+
+                // Reset invincibility state if not user-enabled
+                if (!Player.CheatSystem.UserInvincible && !Player.CheatSystem.NoclipEnabled)
+                {
+                    Plugin.PD.isInvincible = false;
+                }
+
+                // Explicitly invoke FinishedEnteringScene to clear additional flags
                 // Use Reflection as it is private in some versions
                 var method = typeof(HeroController).GetMethod("FinishedEnteringScene", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
                 if (method != null)
                 {
                     method.Invoke(hero, new object[] { true, false });
                 }
+
+                // Notify GameManager that scene entry is complete
+                // This ensures enemies properly recognize the player
+                try
+                {
+                    GameManager.instance.FinishedEnteringScene();
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.LogWarning($"Failed to call GM.FinishedEnteringScene: {ex.Message}");
+                }
+
                 hero.GetComponent<MeshRenderer>().enabled = true;
+
+                // Enable hero's main collider only (NOT child colliders - those include attack hitboxes!)
+                var col2d = hero.GetComponent<Collider2D>();
+                if (col2d != null) col2d.enabled = true;
 
                 // Animation Force
                 hero.StartAnimationControl();
@@ -446,7 +668,54 @@ namespace SilksongManager.SaveState
                     anim.PlayClip("Fall");
                 }
 
-                hero.transitionState = HeroTransitionState.WAITING_TO_TRANSITION;
+                // Accept input
+                hero.AcceptInput();
+
+                // DEBUG: Log hero state for collision debugging
+                Plugin.Log.LogInfo("========== HERO DEBUG LOG ==========");
+                Plugin.Log.LogInfo($"Hero Layer: {hero.gameObject.layer} (LayerMask.LayerToName: {LayerMask.LayerToName(hero.gameObject.layer)})");
+                Plugin.Log.LogInfo($"Hero Tag: {hero.gameObject.tag}");
+                Plugin.Log.LogInfo($"Hero Active: {hero.gameObject.activeInHierarchy}");
+                Plugin.Log.LogInfo($"Hero Position: {hero.transform.position}");
+                Plugin.Log.LogInfo($"cState.transitioning: {hero.cState.transitioning}");
+                Plugin.Log.LogInfo($"cState.dead: {hero.cState.dead}");
+                Plugin.Log.LogInfo($"cState.hazardDeath: {hero.cState.hazardDeath}");
+                Plugin.Log.LogInfo($"cState.Invulnerable: {hero.cState.Invulnerable}");
+                Plugin.Log.LogInfo($"transitionState: {hero.transitionState}");
+                Plugin.Log.LogInfo($"damageMode: {hero.damageMode}");
+                Plugin.Log.LogInfo($"isInvincible (PD): {Plugin.PD?.isInvincible}");
+
+                // Log all colliders on hero
+                var heroColliders = hero.GetComponents<Collider2D>();
+                Plugin.Log.LogInfo($"Hero Colliders ({heroColliders.Length}):");
+                foreach (var col in heroColliders)
+                {
+                    Plugin.Log.LogInfo($"  - {col.GetType().Name}: enabled={col.enabled}, isTrigger={col.isTrigger}");
+                }
+
+                // Log heroBox if exists
+                if (hero.heroBox != null)
+                {
+                    Plugin.Log.LogInfo($"HeroBox: active={hero.heroBox.gameObject.activeInHierarchy}");
+                    var hbCol = hero.heroBox.GetComponent<Collider2D>();
+                    if (hbCol != null)
+                    {
+                        Plugin.Log.LogInfo($"  HeroBox Collider: enabled={hbCol.enabled}, isTrigger={hbCol.isTrigger}");
+                    }
+                }
+
+                // Log child objects with colliders
+                Plugin.Log.LogInfo("Hero Child Colliders:");
+                foreach (var col in hero.GetComponentsInChildren<Collider2D>(true))
+                {
+                    if (col.gameObject != hero.gameObject)
+                    {
+                        Plugin.Log.LogInfo($"  - {col.gameObject.name}: enabled={col.enabled}, active={col.gameObject.activeInHierarchy}");
+                    }
+                }
+                Plugin.Log.LogInfo("========== END HERO DEBUG LOG ==========");
+
+                Plugin.Log.LogInfo("[DEBUG] ApplyStateImmediate: Reset damageMode=FULL_DAMAGE, transitioning=false");
             }
             catch (Exception e)
             {
@@ -486,12 +755,91 @@ namespace SilksongManager.SaveState
             }
         }
 
+        // --- Enemy Debug Logging ---
+
+        /// <summary>
+        /// Logs detailed information about all enemies in the scene including hierarchy and components.
+        /// </summary>
+        private static void LogAllEnemiesDetailed(string context)
+        {
+            Plugin.Log.LogInfo($"========== ENEMY DEBUG LOG: {context} ==========");
+
+            var enemies = UnityEngine.Object.FindObjectsByType<HealthManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Plugin.Log.LogInfo($"Total enemies found: {enemies.Length}");
+
+            foreach (var enemy in enemies)
+            {
+                if (enemy == null || enemy.gameObject == null) continue;
+
+                var go = enemy.gameObject;
+                Plugin.Log.LogInfo($"--- ENEMY: {go.name} ---");
+                Plugin.Log.LogInfo($"  Path: {GetGameObjectPath(go)}");
+                Plugin.Log.LogInfo($"  Active: {go.activeInHierarchy} (self={go.activeSelf})");
+                Plugin.Log.LogInfo($"  HP: {enemy.hp}, IsDead: {enemy.isDead}, IsInvincible: {enemy.IsInvincible}");
+                Plugin.Log.LogInfo($"  Position: {go.transform.position}");
+
+                // Log all components on main object
+                var components = go.GetComponents<Component>();
+                Plugin.Log.LogInfo($"  Components ({components.Length}):");
+                foreach (var comp in components)
+                {
+                    if (comp == null) continue;
+                    string enabled = "";
+                    if (comp is Behaviour b) enabled = $" [enabled={b.enabled}]";
+                    else if (comp is Collider2D c) enabled = $" [enabled={c.enabled}]";
+                    else if (comp is Renderer r) enabled = $" [enabled={r.enabled}]";
+                    Plugin.Log.LogInfo($"    - {comp.GetType().Name}{enabled}");
+                }
+
+                // Log FSM states
+                var fsms = go.GetComponents<PlayMakerFSM>();
+                if (fsms.Length > 0)
+                {
+                    Plugin.Log.LogInfo($"  FSMs ({fsms.Length}):");
+                    foreach (var fsm in fsms)
+                    {
+                        Plugin.Log.LogInfo($"    - {fsm.FsmName}: state='{fsm.ActiveStateName}', enabled={fsm.enabled}");
+
+                        // Log important FSM variables
+                        if (fsm.FsmVariables != null)
+                        {
+                            foreach (var boolVar in fsm.FsmVariables.BoolVariables)
+                            {
+                                if (boolVar.Name.Contains("Spawn") || boolVar.Name.Contains("Active") ||
+                                    boolVar.Name.Contains("Dead") || boolVar.Name.Contains("Alert") ||
+                                    boolVar.Name.Contains("Hero") || boolVar.Name.Contains("Seen"))
+                                {
+                                    Plugin.Log.LogInfo($"      {boolVar.Name} = {boolVar.Value}");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Log child hierarchy (first level only to avoid spam)
+                Plugin.Log.LogInfo($"  Children ({go.transform.childCount}):");
+                foreach (Transform child in go.transform)
+                {
+                    string childActive = child.gameObject.activeInHierarchy ? "active" : "INACTIVE";
+                    Plugin.Log.LogInfo($"    - {child.name} [{childActive}]");
+                }
+            }
+
+            Plugin.Log.LogInfo($"========== END ENEMY DEBUG LOG ==========");
+        }
+
         // --- Enemy & Scene State Capture Methods ---
 
         private static List<EnemyStateData> CaptureEnemyStates()
         {
+            // Log all enemies BEFORE capturing
+            LogAllEnemiesDetailed("BEFORE CAPTURE");
+
             var enemyStates = new List<EnemyStateData>();
-            var enemies = UnityEngine.Object.FindObjectsOfType<HealthManager>();
+            // Find ALL enemies including inactive ones (important for enemies not yet spawned)
+            var enemies = UnityEngine.Object.FindObjectsByType<HealthManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+            Plugin.Log.LogInfo($"[DEBUG] CaptureEnemyStates: Found {enemies.Length} enemies (including inactive)");
 
             foreach (var enemy in enemies)
             {
@@ -500,6 +848,7 @@ namespace SilksongManager.SaveState
                 var data = new EnemyStateData();
                 data.GameObjectName = enemy.gameObject.name;
                 data.GameObjectPath = GetGameObjectPath(enemy.gameObject);
+                data.IsActive = enemy.gameObject.activeInHierarchy;
 
                 // HealthManager state
                 data.HP = enemy.hp;
@@ -629,7 +978,13 @@ namespace SilksongManager.SaveState
         {
             if (enemyStates == null) return;
 
-            var currentEnemies = UnityEngine.Object.FindObjectsOfType<HealthManager>();
+            // Log all enemies BEFORE restoring
+            LogAllEnemiesDetailed("BEFORE RESTORE");
+
+            // Find ALL enemies including inactive ones
+            var currentEnemies = UnityEngine.Object.FindObjectsByType<HealthManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+            Plugin.Log.LogInfo($"[DEBUG] RestoreEnemyStates: Found {currentEnemies.Length} enemies to restore from {enemyStates.Count} saved states");
 
             foreach (var state in enemyStates)
             {
@@ -639,6 +994,10 @@ namespace SilksongManager.SaveState
                     Plugin.Log.LogWarning($"Could not find enemy to restore: {state.GameObjectPath}");
                     continue;
                 }
+
+                // FIRST: Restore active state (important - must be done first!)
+                enemy.gameObject.SetActive(state.IsActive);
+                Plugin.Log.LogInfo($"[DEBUG] Restored enemy '{state.GameObjectName}' active={state.IsActive}");
 
                 // Restore HealthManager
                 enemy.hp = state.HP;
@@ -733,6 +1092,27 @@ namespace SilksongManager.SaveState
                     enemy.gameObject.SetActive(false);
                 }
             }
+
+            // Handle enemies that exist now but weren't in the save (spawned after save was made)
+            // These should be deactivated to match the saved state
+            var savedPaths = new HashSet<string>(enemyStates.Select(s => s.GameObjectPath));
+            foreach (var enemy in currentEnemies)
+            {
+                string path = GetGameObjectPath(enemy.gameObject);
+                if (!savedPaths.Contains(path))
+                {
+                    // This enemy wasn't in the save - it was spawned after the save was made
+                    // Deactivate it to match the saved state
+                    if (enemy.gameObject.activeInHierarchy)
+                    {
+                        Plugin.Log.LogInfo($"[DEBUG] Deactivating enemy not in save: {enemy.gameObject.name}");
+                        enemy.gameObject.SetActive(false);
+                    }
+                }
+            }
+
+            // Log all enemies AFTER restoring
+            LogAllEnemiesDetailed("AFTER RESTORE");
         }
 
         private static void RestoreFsmState(PlayMakerFSM fsm, FsmStateData data)
@@ -781,9 +1161,31 @@ namespace SilksongManager.SaveState
                     // For "Control" FSMs (boss behavior), we need special handling
                     if (fsm.FsmName == "Control")
                     {
-                        // Set the state first
-                        fsm.Fsm.SetState(data.ActiveStateName);
-                        Plugin.Log.LogInfo($"[DEBUG] Set FSM state to '{data.ActiveStateName}', new active: '{fsm.ActiveStateName}'");
+                        // Check if the saved state was an "active" state (enemy was awake/walking)
+                        // These states require proper entry actions that don't run with SetState
+                        bool wasAwakeState = data.ActiveStateName.ToLower().Contains("walk") ||
+                                             data.ActiveStateName.ToLower().Contains("start") ||
+                                             data.ActiveStateName.ToLower().Contains("idle") ||
+                                             data.ActiveStateName.ToLower().Contains("attack") ||
+                                             data.ActiveStateName.ToLower().Contains("chase");
+
+                        // If enemy was in an "awake" state, send ALERT event instead of setting state directly
+                        // This allows the FSM to go through proper wake-up transitions with entry actions
+                        if (wasAwakeState && (currentState.ToLower().Contains("hid") ||
+                                               currentState.ToLower().Contains("sleep") ||
+                                               currentState.ToLower().Contains("wait")))
+                        {
+                            Plugin.Log.LogInfo($"[DEBUG] Enemy was awake (state={data.ActiveStateName}), sending ALERT to wake up naturally");
+                            fsm.SendEvent("ALERT");
+                            fsm.SendEvent("WAKE");
+                            fsm.SendEvent("ACTIVATE");
+                        }
+                        else
+                        {
+                            // Set the state directly for non-wake states
+                            fsm.Fsm.SetState(data.ActiveStateName);
+                            Plugin.Log.LogInfo($"[DEBUG] Set FSM state to '{data.ActiveStateName}', new active: '{fsm.ActiveStateName}'");
+                        }
 
                         // Try to restart the FSM to force it to properly enter the current state
                         // This forces PlayMaker to run the entry actions

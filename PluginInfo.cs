@@ -14,7 +14,7 @@ namespace SilksongManager
         public const string NAME = "Silksong Manager";
 
         /// <summary>Current plugin version (semantic versioning).</summary>
-        public const string VERSION = "1.0.0.1";
+        public const string VERSION = "1.0.0.2";
 
         /// <summary>Plugin author name.</summary>
         public const string AUTHOR = "Catalyst";

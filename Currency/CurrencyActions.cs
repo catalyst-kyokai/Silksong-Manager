@@ -85,6 +85,19 @@ namespace SilksongManager.Currency
             Plugin.Log.LogInfo($"Set shards to {pd.ShellShards}");
         }
 
+        /// <summary>
+        /// Removes shell shards from the player.
+        /// </summary>
+        /// <param name="amount">Number of shards to remove.</param>
+        public static void TakeShards(int amount)
+        {
+            var pd = Plugin.PD;
+            if (pd == null) return;
+
+            pd.ShellShards = Mathf.Max(0, pd.ShellShards - amount);
+            Plugin.Log.LogInfo($"Removed {amount} shards. Current: {pd.ShellShards}");
+        }
+
         #endregion
 
         #region Currency Query

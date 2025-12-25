@@ -56,6 +56,9 @@ namespace SilksongManager.SpeedControl
                 // GameManager patches
                 TryPatch(typeof(GameManager), "UnpauseGame", nameof(GameManager_UnpauseGame_Postfix), ref patchCount);
 
+                // TimeManager patches - CRITICAL: ensures GlobalSpeed is applied after freeze frames, boss deaths, etc.
+                TryPatch(typeof(TimeManager), "UpdateTimeScale", nameof(TimeManager_UpdateTimeScale_Postfix), ref patchCount);
+
                 // HeroController patches
                 TryPatch(typeof(HeroController), "Start", nameof(HeroController_Start_Postfix), ref patchCount);
                 TryPatch(typeof(HeroController), "TakeDamage", nameof(HeroController_TakeDamage_Postfix), ref patchCount);
@@ -447,6 +450,25 @@ namespace SilksongManager.SpeedControl
             {
                 Time.timeScale = SpeedControlConfig.GlobalSpeed;
             }
+        }
+
+        #endregion
+
+        #region TimeManager Patches
+
+        /// <summary>
+        /// Postfix for TimeManager.UpdateTimeScale - ensures our GlobalSpeed is always applied
+        /// after the game calculates its internal time scale.
+        /// This fixes the issue where parry freeze frames, boss deaths, etc. reset speed to 1.
+        /// </summary>
+        public static void TimeManager_UpdateTimeScale_Postfix()
+        {
+            if (!SpeedControlConfig.IsEnabled) return;
+            if (Mathf.Approximately(SpeedControlConfig.GlobalSpeed, 1f)) return;
+
+            // Multiply the game's calculated timeScale by our GlobalSpeed
+            // This ensures our speed multiplier is always applied on top of game's time effects
+            Time.timeScale *= SpeedControlConfig.GlobalSpeed;
         }
 
         #endregion

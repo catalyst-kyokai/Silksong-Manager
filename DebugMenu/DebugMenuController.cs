@@ -63,7 +63,7 @@ namespace SilksongManager.DebugMenu
             _windows.Add(new PlayerWindow());
             _windows.Add(new WorldWindow());
             _windows.Add(new EnemiesWindow());
-            _windows.Add(new ItemsWindow());
+            _windows.Add(new InventoryWindow());
             _windows.Add(new KeybindsWindow());
             _windows.Add(new SettingsWindow());
             _windows.Add(new DebugInfoWindow());
