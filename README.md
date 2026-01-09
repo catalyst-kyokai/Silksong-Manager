@@ -9,6 +9,8 @@
 
 **Silksong Manager** is not just a mod; it is a comprehensive command center for *Hollow Knight: Silksong*. Designed for speedrunners, modders, and deep-dive analysts, it provides unprecedented control over the game engine. From manipulating time scales to dissecting enemy AI states, managing inventory to visualizing collision geometry—if it exists in the game, you can control it.
 
+**Silksong Manager incompatible with "Pantheon Of Pharloom" mod. It also may be incompatible with any other game states changing mods.**
+
 Current Version: **v1.0.0.2**
 
 ---
